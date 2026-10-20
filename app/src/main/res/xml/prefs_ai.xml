@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory android:title="Provider" app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:key="ai"
+            android:title="AI writing tools"
+            android:summary="Proofread and rewrite from the toolbar"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <ListPreference
+            android:key="ai_primary"
+            android:title="Primary"
+            android:defaultValue="gemini"
+            android:entries="@array/ai_primary_entries"
+            android:entryValues="@array/ai_primary_values"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+        <EditTextPreference
+            android:key="gemini_key"
+            android:title="Gemini API key"
+            android:summary="Free from Google AI Studio (aistudio.google.com)"
+            android:dialogMessage="Create a free key at aistudio.google.com, then paste it here."
+            app:iconSpaceReserved="false" />
+        <EditTextPreference
+            android:key="gemini_model"
+            android:title="Gemini model"
+            android:defaultValue="gemini-2.5-flash"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="ai_backup"
+            android:title="Switch providers when a limit is hit"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <EditTextPreference
+            android:key="groq_key"
+            android:title="Groq API key"
+            android:summary="Free from console.groq.com"
+            android:dialogMessage="Create a free key at console.groq.com, then paste it here."
+            app:iconSpaceReserved="false" />
+        <EditTextPreference
+            android:key="groq_model"
+            android:title="Groq model"
+            android:defaultValue="llama-3.3-70b-versatile"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="Safety" app:iconSpaceReserved="false">
+        <Preference
+            android:title="Never in password fields"
+            android:summary="Always on"
+            android:selectable="false"
+            app:iconSpaceReserved="false" />
+        <Preference
+            android:title="Only sends text when you tap"
+            android:summary="Nothing is sent automatically. On the free tiers, providers may use what you send to improve their models."
+            android:selectable="false"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+</PreferenceScreen>

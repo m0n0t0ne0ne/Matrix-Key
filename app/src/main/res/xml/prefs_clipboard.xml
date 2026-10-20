@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory android:title="History" app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:key="clipboard"
+            android:title="Clipboard history"
+            android:summary="Keep items you copy"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <ListPreference
+            android:key="clip_clear"
+            android:title="Auto-clear after"
+            android:defaultValue="3600000"
+            android:entries="@array/clip_clear_entries"
+            android:entryValues="@array/clip_clear_values"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="clip_hide_sensitive"
+            android:title="Hide passwords and codes"
+            android:summary="Don't save copies marked sensitive"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <Preference
+            android:title="Pinned items"
+            android:summary="Long-press an item in the clipboard panel to pin it. Pinned items never clear."
+            android:selectable="false"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+</PreferenceScreen>

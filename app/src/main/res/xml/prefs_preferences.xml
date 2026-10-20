@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory android:title="Keys" app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:key="number_row"
+            android:title="Number row"
+            android:summary="Always show numbers above letters"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="symbol_hints"
+            android:title="Symbol hints"
+            android:summary="Long-press a key for its symbol"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="emoji_key"
+            android:title="Emoji switch key"
+            android:summary="Show the emoji key next to space"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="toolbar"
+            android:title="Toolbar"
+            android:summary="Show tools when there are no suggestions"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="Layout" app:iconSpaceReserved="false">
+        <ListPreference
+            android:key="one_handed"
+            android:title="One-handed mode"
+            android:defaultValue="off"
+            android:entries="@array/one_handed_entries"
+            android:entryValues="@array/one_handed_values"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+        <ListPreference
+            android:key="kb_height"
+            android:title="Keyboard height"
+            android:defaultValue="1.0"
+            android:entries="@array/height_entries"
+            android:entryValues="@array/height_values"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="Key press" app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:key="sound"
+            android:title="Sound on keypress"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+        <SeekBarPreference
+            android:key="sound_volume"
+            android:title="Sound volume"
+            android:defaultValue="40"
+            android:max="100"
+            app:showSeekBarValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="haptic"
+            android:title="Haptic feedback"
+            android:summary="Vibrate on keypress"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <SeekBarPreference
+            android:key="vibration_strength"
+            android:title="Vibration strength"
+            android:defaultValue="50"
+            android:max="100"
+            app:showSeekBarValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="popup"
+            android:title="Popup on keypress"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <ListPreference
+            android:key="long_press_delay"
+            android:title="Long-press delay"
+            android:defaultValue="300"
+            android:entries="@array/delay_entries"
+            android:entryValues="@array/delay_values"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+</PreferenceScreen>

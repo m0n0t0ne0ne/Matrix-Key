@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory android:title="Voice" app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:key="voice"
+            android:title="Use voice typing"
+            android:summary="Mic in the toolbar"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <ListPreference
+            android:key="voice_engine"
+            android:title="Engine"
+            android:defaultValue="ondevice"
+            android:entries="@array/voice_engine_entries"
+            android:entryValues="@array/voice_engine_values"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="voice_punct"
+            android:title="Auto-punctuation"
+            android:summary="Where the speech engine supports it"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <Preference
+            android:key="voice_mic"
+            android:title="Microphone permission"
+            android:summary="Tap to allow"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+</PreferenceScreen>

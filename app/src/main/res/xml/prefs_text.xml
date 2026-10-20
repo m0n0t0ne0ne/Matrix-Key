@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory android:title="Suggestions" app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:key="show_suggestions"
+            android:title="Show suggestion strip"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="next_word"
+            android:title="Next-word suggestions"
+            android:summary="Predict the word you type next"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="emoji_suggestions"
+            android:title="Emoji suggestions"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="block_offensive"
+            android:title="Block offensive words"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="Corrections" app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:key="autocorrect"
+            android:title="Auto-correction"
+            android:summary="Fix misspellings when you press space"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="learn"
+            android:title="Learn from my typing"
+            android:summary="Adapts to your words, spelling habits and swipes"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="learn_aim"
+            android:title="Learn my touch aim"
+            android:summary="Adjusts to where your thumbs land"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="auto_caps"
+            android:title="Auto-capitalization"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="double_space_period"
+            android:title="Double-space period"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+</PreferenceScreen>

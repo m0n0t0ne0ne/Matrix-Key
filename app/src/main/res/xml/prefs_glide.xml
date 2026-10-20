@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory android:title="Glide" app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:key="glide"
+            android:title="Enable glide typing"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="glide_trail"
+            android:title="Show glide trail"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <ListPreference
+            android:key="trail_style"
+            android:title="Trail style"
+            android:defaultValue="auto"
+            android:entries="@array/trail_style_entries"
+            android:entryValues="@array/trail_style_values"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+        <ListPreference
+            android:key="trail_width"
+            android:title="Trail thickness"
+            android:defaultValue="medium"
+            android:entries="@array/trail_width_entries"
+            android:entryValues="@array/trail_width_values"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+        <ListPreference
+            android:key="trail_color"
+            android:title="Trail color"
+            android:defaultValue="accent"
+            android:entries="@array/trail_color_entries"
+            android:entryValues="@array/trail_color_values"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="Gestures" app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:key="gesture_delete"
+            android:title="Gesture delete"
+            android:summary="Swipe left from backspace to delete words"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="gesture_cursor"
+            android:title="Gesture cursor control"
+            android:summary="Slide across space to move the cursor"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="cursor_haptic"
+            android:title="Haptic tick on every cursor move"
+            android:summary="A light tap for each letter you pass"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+</PreferenceScreen>

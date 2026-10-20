@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory android:title="Your data" app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:key="incognito"
+            android:title="Incognito in private tabs"
+            android:summary="Don't learn when an app asks for no personalization"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <Preference
+            android:title="Internet access"
+            android:summary="Only for GIFs and AI writing"
+            android:selectable="false"
+            app:iconSpaceReserved="false" />
+        <Preference
+            android:title="Learning stays on device"
+            android:summary="Nothing you type is uploaded"
+            android:selectable="false"
+            app:iconSpaceReserved="false" />
+        <Preference
+            android:key="reset_learned"
+            android:title="Reset learned data"
+            android:summary="Clears learned words, habits and touch aim"
+            app:iconSpaceReserved="false" />
+        <Preference
+            android:key="delete_all"
+            android:title="Delete all keyboard data"
+            android:summary="Dictionary, clipboard history, themes and settings"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+</PreferenceScreen>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory android:title="GIF search" app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:key="gif"
+            android:title="GIF button"
+            android:summary="Search GIFs from the toolbar"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+        <ListPreference
+            android:key="gif_provider"
+            android:title="Provider"
+            android:defaultValue="giphy"
+            android:entries="@array/gif_provider_entries"
+            android:entryValues="@array/gif_provider_values"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+        <EditTextPreference
+            android:key="giphy_key"
+            android:title="GIPHY API key"
+            android:summary="Free beta key from developers.giphy.com"
+            android:dialogMessage="Create an app at developers.giphy.com (choose API), then paste the key here."
+            app:iconSpaceReserved="false" />
+        <EditTextPreference
+            android:key="klipy_key"
+            android:title="KLIPY API key"
+            android:summary="Free test key from partner.klipy.com"
+            app:iconSpaceReserved="false" />
+        <ListPreference
+            android:key="gif_rating"
+            android:title="Content filter"
+            android:defaultValue="pg-13"
+            android:entries="@array/gif_rating_entries"
+            android:entryValues="@array/gif_rating_values"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="gif_link_fallback"
+            android:title="Link fallback"
+            android:summary="Paste the link when an app can't take GIFs"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+</PreferenceScreen>

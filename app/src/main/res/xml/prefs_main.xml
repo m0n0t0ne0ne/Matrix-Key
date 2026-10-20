@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:key="setup"
+        android:title="Set up"
+        app:iconSpaceReserved="false">
+        <Preference
+            android:key="setup_enable"
+            android:title="1. Turn on Matrix Key"
+            android:summary="Enable it in your phone's keyboard list"
+            app:iconSpaceReserved="false" />
+        <Preference
+            android:key="setup_select"
+            android:title="2. Switch to Matrix Key"
+            android:summary="Pick it as your current keyboard"
+            app:iconSpaceReserved="false" />
+        <Preference
+            android:key="setup_mic"
+            android:title="3. Allow the microphone"
+            android:summary="Needed for voice typing"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="Settings"
+        app:iconSpaceReserved="false">
+        <Preference
+            android:key="open_languages"
+            android:title="Languages"
+            android:summary="English (US) layout"
+            android:fragment="com.matrixkey.settings.PrefsFragment"
+            app:iconSpaceReserved="false">
+            <extra android:name="xml" android:value="prefs_languages" />
+            <extra android:name="title" android:value="Languages" />
+        </Preference>
+        <Preference
+            android:title="Preferences"
+            android:summary="Number row, layout, sound and vibration"
+            android:fragment="com.matrixkey.settings.PrefsFragment"
+            app:iconSpaceReserved="false">
+            <extra android:name="xml" android:value="prefs_preferences" />
+            <extra android:name="title" android:value="Preferences" />
+        </Preference>
+        <Preference
+            android:key="open_theme"
+            android:title="Theme"
+            android:summary="Colors, key shape, font, Rboard themes"
+            app:iconSpaceReserved="false">
+            <intent
+                android:targetPackage="com.matrixkey"
+                android:targetClass="com.matrixkey.settings.ThemeActivity" />
+        </Preference>
+        <Preference
+            android:title="Text correction"
+            android:summary="Suggestions, autocorrect, learning"
+            android:fragment="com.matrixkey.settings.PrefsFragment"
+            app:iconSpaceReserved="false">
+            <extra android:name="xml" android:value="prefs_text" />
+            <extra android:name="title" android:value="Text correction" />
+        </Preference>
+        <Preference
+            android:title="Glide typing"
+            android:summary="Swipe to type, trail, gestures"
+            android:fragment="com.matrixkey.settings.PrefsFragment"
+            app:iconSpaceReserved="false">
+            <extra android:name="xml" android:value="prefs_glide" />
+            <extra android:name="title" android:value="Glide typing" />
+        </Preference>
+        <Preference
+            android:title="Voice typing"
+            android:summary="Speech engine and options"
+            android:fragment="com.matrixkey.settings.PrefsFragment"
+            app:iconSpaceReserved="false">
+            <extra android:name="xml" android:value="prefs_voice" />
+            <extra android:name="title" android:value="Voice typing" />
+        </Preference>
+        <Preference
+            android:title="AI writing"
+            android:summary="Gemini free tier, Groq backup"
+            android:fragment="com.matrixkey.settings.PrefsFragment"
+            app:iconSpaceReserved="false">
+            <extra android:name="xml" android:value="prefs_ai" />
+            <extra android:name="title" android:value="AI writing" />
+        </Preference>
+        <Preference
+            android:title="GIFs"
+            android:summary="GIPHY or KLIPY search"
+            android:fragment="com.matrixkey.settings.PrefsFragment"
+            app:iconSpaceReserved="false">
+            <extra android:name="xml" android:value="prefs_gifs" />
+            <extra android:name="title" android:value="GIFs" />
+        </Preference>
+        <Preference
+            android:title="Clipboard"
+            android:summary="History and auto-clear"
+            android:fragment="com.matrixkey.settings.PrefsFragment"
+            app:iconSpaceReserved="false">
+            <extra android:name="xml" android:value="prefs_clipboard" />
+            <extra android:name="title" android:value="Clipboard" />
+        </Preference>
+        <Preference
+            android:title="Dictionary"
+            android:summary="Personal dictionary and learned words"
+            app:iconSpaceReserved="false">
+            <intent
+                android:targetPackage="com.matrixkey"
+                android:targetClass="com.matrixkey.settings.DictionaryActivity" />
+        </Preference>
+        <Preference
+            android:title="Privacy"
+            android:summary="Learning, internet access, data"
+            android:fragment="com.matrixkey.settings.PrefsFragment"
+            app:iconSpaceReserved="false">
+            <extra android:name="xml" android:value="prefs_privacy" />
+            <extra android:name="title" android:value="Privacy" />
+        </Preference>
+        <Preference
+            android:key="about"
+            android:title="About"
+            android:summary="Matrix Key 0.1.0 · Doto font (SIL OFL) · FrequencyWords (CC BY-SA 4.0)"
+            android:selectable="false"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+</PreferenceScreen>

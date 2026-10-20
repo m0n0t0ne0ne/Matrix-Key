@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="one_handed_entries">
+        <item>Off</item>
+        <item>Right-handed</item>
+        <item>Left-handed</item>
+    </string-array>
+    <string-array name="one_handed_values">
+        <item>off</item>
+        <item>right</item>
+        <item>left</item>
+    </string-array>
+
+    <string-array name="height_entries">
+        <item>Short</item>
+        <item>Mid-short</item>
+        <item>Normal</item>
+        <item>Mid-tall</item>
+        <item>Tall</item>
+    </string-array>
+    <string-array name="height_values">
+        <item>0.85</item>
+        <item>0.92</item>
+        <item>1.0</item>
+        <item>1.08</item>
+        <item>1.16</item>
+    </string-array>
+
+    <string-array name="delay_entries">
+        <item>200 ms</item>
+        <item>300 ms</item>
+        <item>400 ms</item>
+        <item>500 ms</item>
+    </string-array>
+    <string-array name="delay_values">
+        <item>200</item>
+        <item>300</item>
+        <item>400</item>
+        <item>500</item>
+    </string-array>
+
+    <string-array name="trail_style_entries">
+        <item>Auto (matches key font)</item>
+        <item>Dotted</item>
+        <item>Solid</item>
+    </string-array>
+    <string-array name="trail_style_values">
+        <item>auto</item>
+        <item>dot</item>
+        <item>solid</item>
+    </string-array>
+
+    <string-array name="trail_width_entries">
+        <item>Thin</item>
+        <item>Medium</item>
+        <item>Thick</item>
+    </string-array>
+    <string-array name="trail_width_values">
+        <item>thin</item>
+        <item>medium</item>
+        <item>thick</item>
+    </string-array>
+
+    <string-array name="trail_color_entries">
+        <item>Theme accent</item>
+        <item>Key text color</item>
+        <item>White</item>
+    </string-array>
+    <string-array name="trail_color_values">
+        <item>accent</item>
+        <item>text</item>
+        <item>white</item>
+    </string-array>
+
+    <string-array name="voice_engine_entries">
+        <item>On-device (private)</item>
+        <item>Android speech service</item>
+    </string-array>
+    <string-array name="voice_engine_values">
+        <item>ondevice</item>
+        <item>system</item>
+    </string-array>
+
+    <string-array name="ai_primary_entries">
+        <item>Google Gemini (free tier)</item>
+        <item>Groq (free tier)</item>
+    </string-array>
+    <string-array name="ai_primary_values">
+        <item>gemini</item>
+        <item>groq</item>
+    </string-array>
+
+    <string-array name="gif_provider_entries">
+        <item>GIPHY</item>
+        <item>KLIPY</item>
+    </string-array>
+    <string-array name="gif_provider_values">
+        <item>giphy</item>
+        <item>klipy</item>
+    </string-array>
+
+    <string-array name="gif_rating_entries">
+        <item>Strict (G)</item>
+        <item>Moderate (PG-13)</item>
+        <item>Off (R)</item>
+    </string-array>
+    <string-array name="gif_rating_values">
+        <item>g</item>
+        <item>pg-13</item>
+        <item>r</item>
+    </string-array>
+
+    <string-array name="clip_clear_entries">
+        <item>1 hour</item>
+        <item>1 day</item>
+        <item>1 week</item>
+        <item>Never</item>
+    </string-array>
+    <string-array name="clip_clear_values">
+        <item>3600000</item>
+        <item>86400000</item>
+        <item>604800000</item>
+        <item>0</item>
+    </string-array>
+
+    <string-array name="layout_entries">
+        <item>QWERTY</item>
+        <item>QWERTZ</item>
+        <item>AZERTY</item>
+        <item>Dvorak</item>
+        <item>Colemak</item>
+    </string-array>
+    <string-array name="layout_values">
+        <item>qwerty</item>
+        <item>qwertz</item>
+        <item>azerty</item>
+        <item>dvorak</item>
+        <item>colemak</item>
+    </string-array>
+</resources>

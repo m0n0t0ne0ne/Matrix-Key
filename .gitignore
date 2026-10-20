@@ -1,0 +1,12 @@
+*.iml
+.gradle/
+/local.properties
+.idea/
+.DS_Store
+build/
+/captures
+.externalNativeBuild
+.cxx
+# Downloaded at build time (see app/build.gradle.kts)
+app/src/main/assets/fonts/Doto.ttf
+app/src/main/assets/dict/en_50k.txt
