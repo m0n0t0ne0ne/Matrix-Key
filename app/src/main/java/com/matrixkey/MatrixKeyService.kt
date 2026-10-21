@@ -431,10 +431,20 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             justPickedSuggestion = false
             phantomSpaceWasAuto = false
             ic.commitText(text, 1)
+            if (text == "=" && !isPassword) solveMath(ic)
             if (mode != Mode.ALPHA && text == "'" ) setMode(Mode.ALPHA)
             updateShiftFromField()
             refreshSuggestions()
         }
+    }
+
+    /** "5+5(6/2)=" → types the answer right after the "=". */
+    private fun solveMath(ic: android.view.inputmethod.InputConnection) {
+        val before = ic.getTextBeforeCursor(200, 0)?.toString() ?: return
+        if (!before.endsWith("=")) return
+        val answer = com.matrixkey.engine.Calc.solveBefore(before.dropLast(1)) ?: return
+        ic.commitText(answer, 1)
+        prevWord = null
     }
 
     private var justPickedSuggestion = false
