@@ -719,10 +719,11 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                 if (gen != suggestionGen) return@post
                 autoCorrection = auto
                 currentSuggestions = arrange(typed, list, auto)
-                // No predictions to show after a word (or predictions turned off):
-                // offer punctuation instead.
-                if (typed.isEmpty() && currentSuggestions.all { it.isEmpty() } && afterWord()) {
-                    currentSuggestions = PUNCTUATION
+                // Right after "word" + space: punctuation is always on offer.
+                // With next-word prediction on, the two best predictions come first.
+                if (typed.isEmpty() && afterWord()) {
+                    val preds = list.filter { it.isNotEmpty() && it !in PUNCTUATION }.take(2)
+                    currentSuggestions = if (preds.isEmpty()) PUNCTUATION else preds + listOf(",", ".", "?", "!")
                 }
                 showToolbarOrSuggestions()
             }
