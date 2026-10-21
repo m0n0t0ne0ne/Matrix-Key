@@ -68,6 +68,8 @@ jobs:
           KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASS }}
         run: |
           if [ -z "$KEYSTORE_PASS" ]; then echo "::error::KEYSTORE_PASS secret is not set"; exit 1; fi
+          # Pasted secrets often pick up a stray space or line break; the password has none.
+          export KEYSTORE_PASS="$(printf '%s' "$KEYSTORE_PASS" | tr -d ' \r\n\t')"
           set -o pipefail
           KEYSTORE="$RUNNER_TEMP/release.jks" ./gradlew --no-daemon assembleRelease 2>&1 | tee build.log
           rm -f "$RUNNER_TEMP/release.jks"
