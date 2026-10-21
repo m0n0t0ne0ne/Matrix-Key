@@ -9,57 +9,114 @@ A dot-matrix keyboard for Android, built for Nothing phones. It has Gboard-level
 3. Open **Matrix Key**, then follow the setup steps at the top: turn it on, switch to it, and allow the microphone.
 4. Optionally check the download: each release lists the APK's SHA-256 and the signing certificate's fingerprint, which is the same for every release.
 
-## Features
+## Themes
 
-**Look**
-- Uses Nothing's own **NDot** system font for the keys when your phone has it. Otherwise it falls back to the open-source *Doto* dot-matrix font.
-- Dotted icons, a red action key, and a suggestion strip that matches the dot style.
-- Themes: Dynamic Color (Material You), System Auto, Light, Dark, Pure Black and Midnight.
-- **Import Rboard / Gboard `.pack` themes** without root. The importer maps the theme's colors and background image onto Matrix Key.
-- Key shape: Rounded, Rectangular, or **None** (floating letters).
-- Key font: NDot, System, or a font file you import.
-- Accent color: auto, or pick one.
-- Live preview with Cancel and Apply.
+![Matrix Key in six looks: Dynamic Color, Dark, Light, Pure Black, Midnight and an imported Rboard theme](docs/images/themes.png)
 
-**Typing**
-- Number row, symbol hints, and long-press for symbols and accents.
-- Key popups, one-handed mode, and adjustable height.
-- Sound and vibration with adjustable strength.
-- Suggestions, next-word prediction, emoji suggestions and autocorrect. Autocorrect knows which keys are next to each other, so near-miss taps are fixed.
-- **Learns from you, on your phone only:**
-  - your words and names
-  - the misspellings you tend to make
-  - your corrections and undos
-  - where your thumbs actually land on each key
-- Tap backspace right after an autocorrection to undo it.
-- **Proofreading:** tap a word in your text to get its suggestions back and swap it.
-- **Number pad** (the 1234 key on the symbols page) and **quick math**: type `5+5(6/2)=` and the answer appears.
+Open **Settings › Theme** to choose, with a live preview and Cancel / Apply:
 
-**Glide typing**
-- Swipe-to-type that matches the shape of your swipe, with alternatives in the suggestion strip.
-- The glide trail matches your theme: dotted with NDot, solid otherwise, in the accent color. You can adjust its thickness.
-- Slide on the spacebar to move the cursor. **Every one-letter move gives a haptic tick.**
-- Swipe left from backspace to select whole words, then release to delete them.
+- **Colors:** Dynamic Color (follows your wallpaper, the default), System Auto, Light, Dark, Pure Black and Midnight.
+- **Key shape:** Rounded, Rectangular, or **None** for floating letters.
+- **Key font:** Nothing's **NDot** when your phone has it (otherwise the open-source *Doto* dot-matrix font), the system font, or a font file you import.
+- **Accent color:** automatic, or pick your own.
+- **Rboard / Gboard themes:** import a `.pack` file, no root needed. Its colors and background image are mapped onto Matrix Key.
 
-**Toolbar**
-- Emoji panel with recent emoji.
-- Clipboard history with pinning and auto-clear. It skips passwords and one-time codes.
-- **GIF search** with **GIPHY** or **KLIPY** (free key). If an app can't accept GIFs, it pastes the link instead.
-- **AI writing**: Proofread, Formal, Casual, Shorter, Friendlier, Expand, Emojify, Translate, or a custom instruction.
-  - Uses the **Gemini free tier**, and switches to the **Groq free tier** when Gemini's limit is hit.
-  - Never runs in password fields, and sends nothing until you tap.
-- Voice typing with Android's on-device speech recognizer.
-- **Scan text**: take a photo or pick an image and insert the text it contains (read on the phone).
+## Toolbar
 
-## Free API keys
+![The toolbar: Emoji, GIFs, Clipboard, AI writing, Scan text, Settings and Voice](docs/images/toolbar.png)
 
-| Feature | Where to get a key | Paste it in |
-|---|---|---|
-| AI writing | [Google AI Studio](https://aistudio.google.com/apikey) (Gemini) | Settings › AI writing |
-| AI backup | [Groq Console](https://console.groq.com/keys) | Settings › AI writing |
-| GIFs | [GIPHY Developers](https://developers.giphy.com/dashboard/) (choose **API**) or [KLIPY Partner](https://partner.klipy.com) | Settings › GIFs |
+Tap the **grid** button at the top left to switch between the toolbar and word suggestions. When a panel is open, the same button (now a keyboard) takes you back to the keys.
 
-On free tiers, providers may use the text you send to improve their models. Only text you choose to send is sent.
+| Button | What it does |
+|---|---|
+| **Emoji** | Emoji panel with your recent emoji |
+| **GIFs** | Search and send GIFs (needs a free key, see below) |
+| **Clipboard** | Clipboard history with pinning and auto-clear; skips passwords and one-time codes |
+| **AI writing** | Proofread or rewrite your message (needs a free key, see below) |
+| **Scan text** | Take a photo or pick an image and insert the text in it |
+| **Settings** | Opens Matrix Key's settings |
+| **Voice** | Voice typing with your phone's speech recognizer |
+
+![GIF search, AI writing and Scan text](docs/images/tools.png)
+
+## Typing
+
+![Glide typing: the trail follows your swipe and the best match sits in the middle of the suggestion bar](docs/images/typing.png)
+
+- **Suggestions and autocorrect** that know which keys are next to each other. The bar scrolls sideways for more suggestions, and long words are never shrunk.
+- **Glide typing** with a trail in your accent color (dotted with NDot). Your own dictionary words win close calls.
+- **Spacebar cursor:** slide on the spacebar to move the cursor, with a haptic tick for every letter.
+- **Delete words:** swipe left from backspace to select whole words, then let go to delete them.
+- **Proofreading:** tap any word in your text to get its suggestions back and swap it.
+- **Learns on your phone only:** your words and names, the typos you tend to make, your corrections, and where your thumbs land on each key.
+- **Personal dictionary:** add names, slang or your email in *Settings › Dictionary*. They show up as you type or swipe.
+- Number row, symbol hints, long-press for accents, one-handed mode, adjustable height and letter size, sound and vibration.
+
+![The number pad, with quick math filling in the answer after "="](docs/images/numpad.png)
+
+- **Number pad:** the **1234** key on the symbols page opens a calculator-style pad.
+- **Quick math:** type a sum and then `=`, and the answer is filled in. `5+5(6/2)=` gives `20`. Percentages work like a shop calculator: `50+10%=` gives `55`.
+
+## Settings
+
+![Settings home, the AI writing page and the GIFs page](docs/images/settings.png)
+
+Settings follow Nothing's style: a dot-matrix title, a **search bar** that finds any option, and grouped tiles.
+
+| Page | Options |
+|---|---|
+| **Languages** | Keyboard layout (QWERTY, QWERTZ, AZERTY, Dvorak, Colemak) |
+| **Preferences** | Number row, symbol hints, dot-matrix icons, emoji key, toolbar, one-handed mode, letter size, keyboard height, sound, vibration strength, key popups, long-press delay |
+| **Theme** | Colors, key shape, font, accent, Rboard import |
+| **Text correction** | Suggestion strip, next-word and emoji suggestions, offensive-word filter, autocorrect, learning, touch-aim learning, auto-capitals, double-space period |
+| **Glide typing** | Swipe to type, trail style, thickness and color, backspace swipe, spacebar cursor with haptic ticks |
+| **Voice typing** | On/off, speech engine, auto-punctuation, microphone permission |
+| **AI writing** | Gemini and Groq keys, primary provider, models, automatic switching |
+| **GIFs** | GIPHY or KLIPY, API keys, content filter, link fallback |
+| **Clipboard** | History, auto-clear, hide passwords and codes, pinned items |
+| **Dictionary** | Your words and learned words; add, remove, import and export |
+| **Privacy** | Incognito in private tabs, internet access, reset learned data, delete all keyboard data |
+| **About** | Version, privacy in brief, credits and links |
+
+## Set up GIF search
+
+GIFs need a free API key from **GIPHY** or **KLIPY**. You only do this once.
+
+**GIPHY** (easiest)
+1. Go to [developers.giphy.com](https://developers.giphy.com/dashboard/) and sign up or log in.
+2. Tap **Create an API Key** (or **Create an App**) and choose **API**, not SDK.
+3. Give it a name, such as *Matrix Key*, and a short description, accept the terms, and create it.
+4. Copy the **API key** that appears. It's a free beta key.
+5. In Matrix Key, open **Settings › GIFs**, set **Provider** to **GIPHY**, tap **GIPHY API key**, paste and tap **OK**.
+
+**KLIPY** (alternative)
+1. Go to [partner.klipy.com](https://partner.klipy.com), sign up, and create an app to get a free test key.
+2. If it asks for your platform or website, enter `https://github.com/m0n0t0ne0ne/Matrix-Key`.
+3. Copy the key, then in **Settings › GIFs** set **Provider** to **KLIPY** and paste it into **KLIPY API key**.
+
+**Using it:** tap the **GIF** button in the toolbar, tap the search bar and type (or swipe), then tap a GIF to send it. If an app can't accept GIFs, Matrix Key pastes the link instead (*Link fallback*). *Content filter* sets how strict results are.
+
+## Set up AI writing
+
+AI writing uses **Google Gemini's free tier**, with **Groq's free tier** as an optional backup for when Gemini is busy or you hit its limit.
+
+**Gemini** (main)
+1. Go to [aistudio.google.com/apikey](https://aistudio.google.com/apikey) and sign in with your Google account.
+2. Tap **Create API key**, then copy it.
+3. In Matrix Key, open **Settings › AI writing**, tap **Gemini API key**, paste and tap **OK**. Leave **Gemini model** on `auto`; it picks the best available model.
+
+**Groq** (backup, optional)
+1. Go to [console.groq.com/keys](https://console.groq.com/keys) and sign in.
+2. Tap **Create API Key**, give it a name, and copy it right away. It's only shown once.
+3. In **Settings › AI writing**, paste it into **Groq API key** and keep **Switch providers when a limit is hit** on.
+
+**Using it:** type your message (or select part of it), tap the **AI** button, and pick **Proofread**, **Formal**, **Casual**, **Shorter**, **Friendlier**, **Expand**, **Emojify**, **Translate…** or **✎ Custom**. Check the result, then tap **Replace**, **Try again** or **Back**.
+
+Nothing is sent until you tap an action, and AI writing never runs in password fields. On the free tiers, Google and Groq may use what you send to improve their models, so don't use it for anything private.
+
+## Scan text
+
+Tap the **Scan text** button, then **Take photo** or **Choose image**. The text is read on your phone and never uploaded. Edit it if you need to, then tap **Insert text** to type it where you were. Scan text uses Google Play services' text reader; the first time, your phone may take a minute to download it.
 
 ## Privacy
 

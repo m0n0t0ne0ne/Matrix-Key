@@ -1,0 +1,507 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>body{margin:0;background:#888} canvas{display:block;margin:0 0 20px 0}</style>
+</head><body>
+<script>
+// ---------------------------------------------------------------------------
+// Canvas renderings of Matrix Key, drawn from the app's own layout numbers,
+// theme colors and icon paths (KeyboardView, TopBarView, Icons, ThemeManager).
+// ---------------------------------------------------------------------------
+const SANS = '"Inter", "DejaVu Sans", sans-serif';
+
+const THEMES = {
+  dynamic: { bg:'#1A1C19', key:'#2F312D', mod:'#2D322C', pill:'#3A4B39', chip:'#2F312D', text:'#F0F1EB', sub:'#A9B0A6', divider:'#5D6459', accent:'#92D695', onAccent:'#00390F' },
+  dark:    { bg:'#121619', key:'#1D2226', mod:'#171B1F', pill:'#262C31', chip:'#1D2226', text:'#E6EAED', sub:'#98A2AA', divider:'#3A4248', accent:'#D71921', onAccent:'#FFFFFF' },
+  light:   { bg:'#E3E6E9', key:'#F5F6F8', mod:'#EAECEF', pill:'#D3D8DD', chip:'#F5F6F8', text:'#111214', sub:'#565B62', divider:'#A3A8AE', accent:'#D71921', onAccent:'#FFFFFF' },
+  black:   { bg:'#000000', key:'#161616', mod:'#0E0E0E', pill:'#1E1E1E', chip:'#161616', text:'#F2F2F2', sub:'#9A9A9A', divider:'#4A4A4A', accent:'#D71921', onAccent:'#FFFFFF' },
+  midnight:{ bg:'#020A17', key:'#0B1526', mod:'#07101F', pill:'#13203A', chip:'#0B1526', text:'#E8EEF7', sub:'#8FA0B8', divider:'#2A3A55', accent:'#C62828', onAccent:'#FFFFFF' },
+  rboard:  { bg:'#1b1035', key:'rgba(255,255,255,0.14)', mod:'rgba(255,255,255,0.08)', pill:'rgba(255,255,255,0.18)', chip:'rgba(255,255,255,0.14)', text:'#FFFFFF', sub:'#D9CCF5', divider:'rgba(255,255,255,0.3)', accent:'#FF5FA2', onAccent:'#FFFFFF',
+             image:[['#3b1c6e',0],['#6a2c91',0.45],['#1f4f9a',1]] },
+};
+
+// --- Dot-matrix text: glyphs are rasterised small, then every lit pixel becomes a dot.
+const dotCache = {};
+function glyphGrid(str) {
+  if (dotCache[str]) return dotCache[str];
+  const F = 10, c = document.createElement('canvas'), g = c.getContext('2d');
+  g.font = `600 ${F}px ${SANS}`;
+  const w = Math.ceil(g.measureText(str).width) + 2, h = 16;
+  c.width = w; c.height = h;
+  g.font = `600 ${F}px ${SANS}`; g.fillStyle = '#000'; g.textBaseline = 'alphabetic';
+  g.fillText(str, 1, 11);
+  const d = g.getImageData(0, 0, w, h).data, pts = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 110) pts.push([x, y]);
+  return dotCache[str] = { w, pts, F };
+}
+// size = font size in px (like Paint.textSize); cy = vertical centre of caps; align: center/left/right
+function dotText(ctx, str, x, cy, size, color, align = 'center') {
+  const gg = glyphGrid(str), p = size / gg.F * 0.95;
+  const width = gg.w * p;
+  const x0 = align === 'center' ? x - width / 2 : align === 'right' ? x - width : x;
+  const y0 = cy - 7.4 * p;
+  ctx.fillStyle = color;
+  for (const [gx, gy] of gg.pts) { ctx.beginPath(); ctx.arc(x0 + gx * p + p / 2, y0 + gy * p + p / 2, p * 0.42, 0, 7); ctx.fill(); }
+  return width;
+}
+function sansText(ctx, str, x, cy, size, color, align = 'center', weight = 400) {
+  ctx.font = `${weight} ${size}px ${SANS}`; ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  ctx.fillText(str, x, cy + size * 0.04);
+  return ctx.measureText(str).width;
+}
+function label(ctx, dotted, str, x, cy, size, color, align = 'center', weight = 400) {
+  return dotted ? dotText(ctx, str, x, cy, size, color, align) : sansText(ctx, str, x, cy, size, color, align, weight);
+}
+
+// --- Icons (24 × 24 paths from Icons.kt)
+const rr = (l, t, r, b, k) => `M${l + k} ${t}H${r - k}Q${r} ${t} ${r} ${t + k}V${b - k}Q${r} ${b} ${r - k} ${b}H${l + k}Q${l} ${b} ${l} ${b - k}V${t + k}Q${l} ${t} ${l + k} ${t}Z`;
+const circ = (cx, cy, r) => `M${cx - r} ${cy}A${r} ${r} 0 1 0 ${cx + r} ${cy}A${r} ${r} 0 1 0 ${cx - r} ${cy}Z`;
+const STROKES = {
+  SHIFT: 'M12 3.5L3.5 12L8.5 12L8.5 19.5L15.5 19.5L15.5 12L20.5 12Z',
+  BACKSPACE: 'M9 6L20.5 6L20.5 18L9 18L3.5 12Z M12 9.5L17 14.5M17 9.5L12 14.5',
+  ENTER: 'M19.5 6L19.5 12.5L5 12.5M9.5 8L5 12.5L9.5 17',
+  SEARCH: circ(10.5, 10.5, 6.5) + 'M15.5 15.5L20.5 20.5',
+  EMOJI: circ(12, 12, 8.5) + 'M8.5 14Q12 17.5 15.5 14',
+  MIC: 'M6 11A6 6 0 0 0 18 11M12 17L12 21M9 21L15 21',
+  CHEVRON_RIGHT: 'M9.5 6L15.5 12L9.5 18',
+  CLIPBOARD: rr(5, 5, 19, 21, 2) + rr(9, 3, 15, 7, 1) + 'M8.5 11L15.5 11M8.5 14.5L15.5 14.5M8.5 18L13 18',
+  GIF: 'M12 3L21 12L12 21L3 12Z M12 8.5L12 15.5M8.5 12L15.5 12',
+  AI: 'M14.5 6.5L17.5 9.5L9 18L5.5 18.5L6 15Z M5 3L5 7.5M2.75 5.25L7.25 5.25M19 2.5L19 5.5M17.5 4L20.5 4',
+  SCAN: 'M4 8L4 5Q4 4 5 4L8 4M16 4L19 4Q20 4 20 5L20 8M20 16L20 19Q20 20 19 20L16 20M8 20L5 20Q4 20 4 19L4 16M8 9L16 9M8 12L16 12M8 15L13 15',
+  KEYBOARD: rr(3, 6, 21, 18, 2) + 'M7 10L7.1 10M11 10L11.1 10M15 10L15.1 10M8 14.5L16 14.5',
+  CLOSE: 'M6 6L18 18M18 6L6 18',
+};
+const FILLS = { EMOJI: circ(9, 10, 1.4) + circ(15, 10, 1.4), MIC: rr(9, 3, 15, 14, 3) };
+function gearPath() {
+  let s = '', teeth = 8, steps = teeth * 4;
+  for (let i = 0; i <= steps; i++) {
+    const a = Math.PI * 2 * i / steps - Math.PI / 2 + Math.PI / steps, r = (Math.floor(i / 2) % 2 === 0) ? 10.2 : 7.6;
+    s += (i ? 'L' : 'M') + (12 + r * Math.cos(a)).toFixed(2) + ' ' + (12 + r * Math.sin(a)).toFixed(2);
+  }
+  return s + 'Z' + circ(12, 12, 3.3);
+}
+const SOLID = { GRID: rr(3.5, 3.5, 10.5, 10.5, 2.2) + rr(13.5, 3.5, 20.5, 10.5, 2.2) + rr(3.5, 13.5, 10.5, 20.5, 2.2) + rr(13.5, 13.5, 20.5, 20.5, 2.2), SETTINGS: gearPath() };
+
+function icon(ctx, name, cx, cy, size, color, dotted, filled = false) {
+  const s = size / 24;
+  ctx.save(); ctx.translate(cx - 12 * s, cy - 12 * s); ctx.scale(s, s);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (!dotted && SOLID[name]) { ctx.fill(new Path2D(SOLID[name]), 'evenodd'); ctx.restore(); return; }
+  if (STROKES[name]) {
+    const p = new Path2D(STROKES[name]);
+    if (dotted) { ctx.lineWidth = 2.5; ctx.setLineDash([0.01, 3.4]); } else { ctx.lineWidth = 2; ctx.setLineDash([]); }
+    if (filled) { ctx.setLineDash([]); ctx.fill(p); }
+    ctx.stroke(p); ctx.setLineDash([]);
+  }
+  if (FILLS[name]) ctx.fill(new Path2D(FILLS[name]));
+  ctx.restore();
+}
+
+function rrect(ctx, x, y, w, h, r, color) {
+  ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill();
+}
+
+// --- Keyboard (Layouts.alpha + KeyboardView + TopBarView), in dp, drawn at scale S.
+const HINTS = { q:'%', w:'\\', e:'|', r:'=', t:'[', y:']', u:'<', i:'>', o:'{', p:'}', a:'@', s:'#', d:'$', f:'_', g:'&', h:'-', j:'+', k:'(', l:')', z:'*', x:'"', c:"'", v:':', b:';', n:'!', m:'?' };
+function alphaRows(o) {
+  const rows = [];
+  if (o.numberRow) rows.push({ h: 50, keys: [...'1234567890'].map(c => ({ t: 'char', l: c })) });
+  rows.push({ h: 54, keys: [...'qwertyuiop'].map(c => ({ t: 'char', l: c, hint: HINTS[c] })) });
+  rows.push({ h: 54, keys: [{ t: 'spacer', w: .5 }, ...[...'asdfghjkl'].map(c => ({ t: 'char', l: c, hint: HINTS[c] })), { t: 'spacer', w: .5 }] });
+  rows.push({ h: 54, keys: [{ t: 'shift', w: 1.5, mod: 1 }, ...[...'zxcvbnm'].map(c => ({ t: 'char', l: c, hint: HINTS[c] })), { t: 'back', w: 1.5, mod: 1 }] });
+  const b = [{ t: 'sym', l: '?123', w: 1.5, mod: 1, pill: 1 }, { t: 'char', l: ',', mod: 1 }];
+  if (o.emojiKey) b.push({ t: 'emoji', mod: 1 });
+  b.push({ t: 'space', w: o.emojiKey ? 4.5 : 5.5, pill: 1 }, { t: 'char', l: '.', mod: 1 }, { t: 'enter', w: 1.5, pill: 1 });
+  rows.push({ h: 54, keys: b });
+  return rows;
+}
+
+// Returns {height, centers} ; draws at (ox, oy) with width W (dp) and scale S.
+function keyboard(ctx, ox, oy, W, S, th, o) {
+  const rows = alphaRows(o), dotted = o.dotted, boxed = o.shape !== 'none';
+  const barH = o.bar ? 52 : 0;
+  const H = barH + rows.reduce((a, r) => a + r.h, 0) + 8 + (o.extraBottom || 0);
+  ctx.save(); ctx.translate(ox, oy); ctx.scale(S, S);
+  // background
+  if (th.image) {
+    const g = ctx.createLinearGradient(0, 0, W, H); th.image.forEach(([c, s]) => g.addColorStop(s, c));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // a soft dotted pattern, like a wallpaper image
+    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    for (let y = 6; y < H; y += 12) for (let x = 6 + ((y / 12) % 2) * 6; x < W; x += 12) { ctx.beginPath(); ctx.arc(x, y, 1.6, 0, 7); ctx.fill(); }
+  } else { ctx.fillStyle = th.bg; ctx.fillRect(0, 0, W, H); }
+
+  if (o.bar) topBar(ctx, W, th, o);
+  const centers = {};
+  let y = barH + 4;
+  const gapX = 6, gapY = 8, side = 3;
+  for (const row of rows) {
+    const total = row.keys.reduce((a, k) => a + (k.w || 1), 0), unit = (W - side * 2) / total;
+    let x = side;
+    for (const k of row.keys) {
+      const w = unit * (k.w || 1);
+      const r = { x: x + gapX / 2, y: y + gapY / 2, w: w - gapX, h: row.h - gapY };
+      x += w;
+      if (k.t === 'spacer') continue;
+      if (k.t === 'char' && /[a-z]/.test(k.l)) centers[k.l] = [r.x + r.w / 2, r.y + r.h / 2];
+      let bg = null;
+      if (k.t === 'enter') bg = th.accent; else if (boxed) bg = k.mod ? th.mod : th.key; else if (k.pill) bg = th.pill;
+      const rad = k.t === 'enter' || (!boxed && k.pill) ? r.h / 2 : o.shape === 'rectangular' ? 4 : 11;
+      if (bg) rrect(ctx, r.x, r.y, r.w, r.h, rad, bg);
+      const fg = k.t === 'enter' ? th.onAccent : th.text, cx = r.x + r.w / 2, cy = r.y + r.h / 2, isz = r.h * 0.6;
+      if (k.t === 'shift') icon(ctx, 'SHIFT', cx, cy, isz, fg, dotted);
+      else if (k.t === 'back') icon(ctx, 'BACKSPACE', cx, cy, isz * 1.08, fg, dotted);
+      else if (k.t === 'enter') icon(ctx, 'ENTER', cx, cy, isz * 1.05, fg, dotted);
+      else if (k.t === 'emoji') icon(ctx, 'EMOJI', cx, cy, isz, fg, dotted);
+      else if (k.t === 'space') { }
+      else {
+        const txt = k.l, sc = 1.2;
+        let size = txt.length > 2 ? r.h * 0.32 * (1 + (sc - 1) * 0.5) : (txt === ',' || txt === '.') ? r.h * 0.55 : r.h * (dotted ? 0.5 : 0.46) * sc;
+        label(ctx, dotted, txt, cx, cy + (txt === ',' || txt === '.' ? r.h * 0.12 : 0), size, fg);
+        if (o.hints && k.hint) {
+          const hs = r.h * 0.24 * (1 + (sc - 1) * 0.4);
+          label(ctx, dotted, k.hint, r.x + r.w - 3, r.y + hs * 0.75 + 1, hs, th.sub, 'right');
+        }
+      }
+    }
+    y += row.h;
+  }
+  if (o.trail) trail(ctx, o.trail.map(c => centers[c]), th.accent, dotted);
+  ctx.restore();
+  return { height: H * S, centers };
+}
+
+function trail(ctx, pts, color, dotted) {
+  // Smooth the key-to-key path like a real swipe, then draw it as dots (or a line).
+  const path = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [ax, ay] = pts[i], [bx, by] = pts[i + 1];
+    for (let t = 0; t < 1; t += 0.05) path.push([ax + (bx - ax) * t, ay + (by - ay) * t]);
+  }
+  path.push(pts[pts.length - 1]);
+  for (let k = 0; k < 6; k++) for (let i = 1; i < path.length - 1; i++) path[i] = [(path[i - 1][0] + path[i][0] + path[i + 1][0]) / 3, (path[i - 1][1] + path[i][1] + path[i + 1][1]) / 3];
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); path.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+  if (dotted) { ctx.lineWidth = 6; ctx.setLineDash([0.01, 9]); } else { ctx.lineWidth = 6; ctx.setLineDash([]); }
+  ctx.globalAlpha = 0.95; ctx.stroke(); ctx.globalAlpha = 1; ctx.setLineDash([]);
+}
+
+function roundButton(ctx, r, name, bg, fg) {
+  if (bg) { ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(r.x + r.w / 2, r.y + r.h / 2, r.h / 2, 0, 7); ctx.fill(); }
+  icon(ctx, name, r.x + r.w / 2, r.y + r.h / 2, r.h * 0.6, fg, false);
+}
+
+function topBar(ctx, W, th, o) {
+  const btn = 44, top = (52 - btn) / 2;
+  const left = { x: 6, y: top, w: btn, h: btn }, right = { x: W - 6 - btn, y: top, w: btn, h: btn };
+  if (o.bar === 'toolbar') {
+    roundButton(ctx, left, o.panel ? 'KEYBOARD' : 'GRID', o.panel ? th.chip : null, th.text);
+    const tools = ['EMOJI', 'GIF', 'CLIPBOARD', 'AI', 'SCAN', 'SETTINGS', 'MIC'];
+    const area = W - (left.x + btn) - 8, cell = area / tools.length;
+    o.toolCenters = [];
+    tools.forEach((t, i) => {
+      const cx = left.x + btn + 4 + cell * i + cell / 2;
+      const r = { x: cx - btn / 2, y: top, w: btn, h: btn };
+      const active = t === o.active;
+      roundButton(ctx, r, t, active ? th.accent : t === 'MIC' ? th.pill : null, active ? th.onAccent : th.text);
+      o.toolCenters.push(cx);
+    });
+  } else {
+    roundButton(ctx, left, 'CHEVRON_RIGHT', th.chip, th.text);
+    roundButton(ctx, right, 'CLIPBOARD', th.chip, th.text);
+    const sx = left.x + btn + 6, sw = right.x - 6 - sx, n = o.suggestions.length;
+    o.suggestions.forEach((s, i) => {
+      const cx = sx + sw / n * (i + 0.5);
+      if (i > 0) { ctx.fillStyle = th.divider; ctx.fillRect(sx + sw / n * i - 0.5, top + 10, 1, btn - 20); }
+      label(ctx, o.dotted, s, cx, top + btn / 2, btn * 0.46, i === 1 ? th.text : th.sub, 'center', i === 1 && !o.dotted ? 700 : 400);
+    });
+  }
+}
+
+// --- Canvases -----------------------------------------------------------------
+function mk(id, w, h, bg) {
+  const c = document.createElement('canvas'); c.id = id; c.width = w; c.height = h; document.body.appendChild(c);
+  const ctx = c.getContext('2d'); if (bg) { ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h); } return ctx;
+}
+const PAGE = '#0B0B0B', INK = '#F2F2F2', SUB = '#9A9A9A';
+
+// 1. Themes
+(function () {
+  const S = 1.5, W = 400, cols = 2, pad = 40, gap = 40, capH = 70;
+  const list = [
+    ['DYNAMIC COLOR', 'Default: matches your wallpaper, floating keys, NDot', THEMES.dynamic, { shape: 'none', dotted: true }],
+    ['DARK', 'Rounded keys, system font', THEMES.dark, { shape: 'rounded', dotted: false }],
+    ['LIGHT', 'Rounded keys, system font', THEMES.light, { shape: 'rounded', dotted: false }],
+    ['PURE BLACK', 'Floating keys, NDot', THEMES.black, { shape: 'none', dotted: true }],
+    ['MIDNIGHT', 'Rectangular keys, NDot', THEMES.midnight, { shape: 'rectangular', dotted: true }],
+    ['RBOARD IMPORT', 'Colors and background from a .pack theme', THEMES.rboard, { shape: 'rounded', dotted: false }],
+  ];
+  const kbH = (52 + 50 + 54 * 4 + 8) * S;
+  const cw = W * S, w = pad * 2 + cols * cw + (cols - 1) * gap, rowsN = Math.ceil(list.length / cols);
+  const ctx = mk('themes', w, pad * 2 + rowsN * (kbH + capH) + (rowsN - 1) * gap, PAGE);
+  list.forEach(([name, sub, th, o], i) => {
+    const x = pad + (i % cols) * (cw + gap), y = pad + Math.floor(i / cols) * (kbH + capH + gap);
+    ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, cw, kbH, 18); ctx.clip();
+    keyboard(ctx, x, y, W, S, th, { ...o, numberRow: true, hints: true, emojiKey: true, bar: 'suggestions', suggestions: ['the', 'I', 'it'] });
+    ctx.restore();
+    dotText(ctx, name, x + 4, y + kbH + 26, 26, INK, 'left');
+    sansText(ctx, sub, x + 4, y + kbH + 56, 20, SUB, 'left');
+  });
+})();
+
+// 2. Toolbar with callouts
+(function () {
+  const S = 2.7, W = 400, top = 230;
+  const th = THEMES.black, o = { shape: 'none', dotted: true, numberRow: true, hints: true, emojiKey: true, bar: 'toolbar' };
+  const H = top + (52 + 50 + 54 * 4 + 8) * S + 40;
+  const ctx = mk('toolbar', W * S, H, PAGE);
+  ctx.save(); ctx.beginPath(); ctx.roundRect(0, top, W * S, H - top - 40, 0); ctx.clip();
+  keyboard(ctx, 0, top, W, S, th, o); ctx.restore();
+  const names = ['Emoji', 'GIFs', 'Clipboard', 'AI writing', 'Scan text', 'Settings', 'Voice'];
+  o.toolCenters.forEach((cx, i) => {
+    const x = cx * S, ly = i % 2 === 0 ? 70 : 150;
+    ctx.strokeStyle = '#555'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, ly + 28); ctx.lineTo(x, top + 8 * S); ctx.stroke();
+    ctx.fillStyle = '#555'; ctx.beginPath(); ctx.arc(x, top + 8 * S, 6, 0, 7); ctx.fill();
+    const tw = sansText(ctx, names[i], 0, -100, 34, INK, 'left', 600);
+    const bx = Math.min(Math.max(x - tw / 2 - 22, 12), W * S - tw - 56);
+    rrect(ctx, bx, ly - 26, tw + 44, 54, 27, '#1E1E1E');
+    sansText(ctx, names[i], bx + 22 + tw / 2, ly, 34, INK, 'center', 600);
+  });
+})();
+
+// 3. Typing: suggestions + glide trail
+(function () {
+  const S = 2.7, W = 400;
+  const th = THEMES.dark, o = { shape: 'rounded', dotted: false, numberRow: true, hints: true, emojiKey: true, bar: 'suggestions', suggestions: ['metric', 'matrix', 'matrices'], trail: [...'matrix'] };
+  const ctx = mk('typing', W * S, (52 + 50 + 54 * 4 + 8) * S, PAGE);
+  keyboard(ctx, 0, 0, W, S, th, o);
+})();
+
+// Panels share the toolbar strip on top; body area = keyboard body height.
+function panelFrame(ctx, x, y, W, S, th, active, bodyH) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(S, S);
+  ctx.fillStyle = th.bg; ctx.fillRect(0, 0, W, 52 + bodyH);
+  const o = { bar: 'toolbar', panel: true, active };
+  topBar(ctx, W, th, o);
+  ctx.restore();
+}
+function chip(ctx, x, y, txt, th, filled, h = 40) {
+  ctx.font = `400 14px ${SANS}`; const w = ctx.measureText(txt).width + 32;
+  rrect(ctx, x, y, w, h, 20, filled ? th.accent : th.key);
+  sansText(ctx, txt, x + w / 2, y + h / 2, 14, filled ? th.onAccent : th.text);
+  return w;
+}
+
+// 4. GIF / AI / Scan
+(function () {
+  const S = 2.2, W = 400, bodyH = 50 + 54 * 4 + 8, gap = 50, pad = 40, capH = 80;
+  const ph = (52 + bodyH) * S, pw = W * S;
+  const ctx = mk('tools', pad * 2 + pw * 3 + gap * 2, pad * 2 + ph + capH, PAGE);
+  const th = THEMES.black;
+
+  // GIF panel
+  let x0 = pad, y0 = pad;
+  ctx.save(); ctx.beginPath(); ctx.roundRect(x0, y0, pw, ph, 20); ctx.clip();
+  panelFrame(ctx, x0, y0, W, S, th, 'GIF', bodyH);
+  ctx.save(); ctx.translate(x0, y0 + 52 * S); ctx.scale(S, S);
+  let cx = 8; cx += chip(ctx, 8, 4, 'ABC', th, false) + 8;
+  rrect(ctx, cx, 4, W - 8 - cx, 40, 20, th.key);
+  sansText(ctx, 'Search GIPHY', cx + 16, 24, 15, th.sub, 'left');
+  sansText(ctx, 'Trending', W / 2, 62, 14, th.sub);
+  const tiles = [['#2b2b2b', 64], ['#3a1f22', 88], ['#1f2b3a', 72], ['#26331f', 92], ['#33291f', 70], ['#2d1f33', 80]];
+  const colW = (W - 16 - 6) / 2; const colY = [76, 76];
+  tiles.forEach(([c, h], i) => {
+    const col = colY[0] <= colY[1] ? 0 : 1, tx = 8 + col * (colW + 6), ty = colY[col];
+    rrect(ctx, tx, ty, colW, h, 10, c);
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    for (let yy = ty + 8; yy < ty + h - 4; yy += 8) for (let xx = tx + 8; xx < tx + colW - 4; xx += 8)
+      if (Math.sin(xx * 0.09 + i) * Math.cos(yy * 0.12 + i * 2) > 0.2) { ctx.beginPath(); ctx.arc(xx, yy, 1.8, 0, 7); ctx.fill(); }
+    colY[col] += h + 6;
+  });
+  ctx.restore(); ctx.restore();
+
+  // AI panel
+  x0 = pad + pw + gap;
+  ctx.save(); ctx.beginPath(); ctx.roundRect(x0, y0, pw, ph, 20); ctx.clip();
+  panelFrame(ctx, x0, y0, W, S, th, 'AI', bodyH);
+  ctx.save(); ctx.translate(x0, y0 + 52 * S); ctx.scale(S, S);
+  cx = 8 + chip(ctx, 8, 4, 'ABC', th, false) + 12;
+  dotText(ctx, 'AI writing', cx, 24, 20, th.text, 'left');
+  sansText(ctx, 'Your message', 12, 62, 12, th.sub, 'left');
+  rrect(ctx, 8, 72, W - 16, 92, 14, th.key);
+  ctx.font = `400 15px ${SANS}`; ctx.fillStyle = th.sub; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ['hey can u send me the notes from', 'todays meeting when u get a sec', 'thx'].forEach((l, i) => ctx.fillText(l, 20, 84 + i * 22));
+  const r1 = ['Proofread', 'Formal', 'Casual', 'Shorter', 'Friendlier'], r2 = ['Expand', 'Emojify', 'Translate…', '✎ Custom'];
+  cx = 8; r1.forEach((t, i) => { cx += chip(ctx, cx, 176, t, th, i === 0) + 6; });
+  cx = 8; r2.forEach(t => { cx += chip(ctx, cx, 222, t, th, false) + 6; });
+  ctx.restore(); ctx.restore();
+
+  // Scan text screen (settings style)
+  x0 = pad + (pw + gap) * 2;
+  ctx.save(); ctx.beginPath(); ctx.roundRect(x0, y0, pw, ph, 20); ctx.clip();
+  ctx.fillStyle = '#000'; ctx.fillRect(x0, y0, pw, ph);
+  ctx.save(); ctx.translate(x0, y0); ctx.scale(S, S);
+  ctx.fillStyle = '#141414'; ctx.beginPath(); ctx.arc(16 + 26, 12 + 28, 26, 0, 7); ctx.fill();
+  ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(48, 34); ctx.lineTo(42, 40); ctx.lineTo(48, 46); ctx.stroke();
+  dotText(ctx, 'SCAN TEXT', 24, 92, 34, INK, 'left');
+  rrect(ctx, 16, 120, (W - 40) / 2, 44, 22, INK); sansText(ctx, 'Take photo', 16 + (W - 40) / 4, 142, 15, '#000', 'center', 600);
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.roundRect(24 + (W - 40) / 2, 120, (W - 40) / 2, 44, 22); ctx.stroke();
+  sansText(ctx, 'Choose image', 24 + (W - 40) * 3 / 4, 142, 15, INK, 'center', 600);
+  rrect(ctx, 16, 176, W - 32, 84, 18, '#141414');
+  ctx.font = `400 15px ${SANS}`; ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ['OPEN DAILY 8AM - 10PM', 'Wi-Fi: CafeGuest', 'Password: latte2026'].forEach((l, i) => ctx.fillText(l, 30, 186 + i * 22));
+  rrect(ctx, 16, 270, W - 32, 44, 22, INK); sansText(ctx, 'Insert text', W / 2, 292, 15, '#000', 'center', 600);
+  ctx.restore(); ctx.restore();
+
+  [['GIF SEARCH', 'GIPHY or KLIPY, sends real GIFs'], ['AI WRITING', 'Proofread or rewrite in one tap'], ['SCAN TEXT', 'Photo or image to text, on the phone']].forEach(([a, b], i) => {
+    const x = pad + i * (pw + gap);
+    dotText(ctx, a, x + 4, pad + ph + 34, 26, INK, 'left');
+    sansText(ctx, b, x + 4, pad + ph + 66, 20, SUB, 'left');
+  });
+})();
+
+// 5. Settings screens
+const ICONS = __ICONS__;
+function mkIcon(ctx, name, cx, cy, size, color) {
+  const ic = ICONS[name]; if (!ic) return;
+  const s = size / ic.vw;
+  ctx.save(); ctx.translate(cx - size / 2, cy - size / 2); ctx.scale(s, s);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ic.paths.forEach(p => { const pp = new Path2D(p.d); if (p.fill) ctx.fill(pp); if (p.stroke) { ctx.lineWidth = p.sw || 1.8; ctx.stroke(pp); } });
+  ctx.restore();
+}
+function settingsScreen(ctx, x, y, W, H, S, title, groups, opts = {}) {
+  ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, W * S, H * S, 20); ctx.clip();
+  ctx.fillStyle = '#000'; ctx.fillRect(x, y, W * S, H * S);
+  ctx.translate(x, y); ctx.scale(S, S);
+  if (opts.back) {
+    ctx.fillStyle = '#141414'; ctx.beginPath(); ctx.arc(42, 40, 26, 0, 7); ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(48, 34); ctx.lineTo(42, 40); ctx.lineTo(48, 46); ctx.stroke();
+  }
+  dotText(ctx, title, 24, 104, 38, INK, 'left');
+  let yy = 140;
+  if (opts.search) {
+    rrect(ctx, 16, yy, W - 32, 56, 28, '#141414');
+    ctx.globalAlpha = 0.75; mkIcon(ctx, 'ic_mk_search', 50, yy + 28, 24, INK); ctx.globalAlpha = 1;
+    sansText(ctx, 'Search settings', 78, yy + 28, 18, SUB, 'left');
+    yy += 70;
+  }
+  for (const g of groups) {
+    if (g.title) { yy += 20; dotText(ctx, g.title, 24, yy + 7, 14, SUB, 'left'); yy += 26; } else yy += 14;
+    g.items.forEach((it, i) => {
+      const h = it.summary ? 72 : 56, first = i === 0, last = i === g.items.length - 1;
+      const t = first ? 26 : 6, b = last ? 26 : 6;
+      ctx.fillStyle = '#141414'; ctx.beginPath(); ctx.roundRect(16, yy, W - 32, h, [t, t, b, b]); ctx.fill();
+      let tx = 32;
+      if (it.icon) { mkIcon(ctx, it.icon, 48, yy + h / 2, 24, INK); tx = 80; }
+      if (it.summary) {
+        sansText(ctx, it.title, tx, yy + 26, 17, INK, 'left');
+        let sm = it.summary; ctx.font = `400 14px ${SANS}`;
+        const maxW = W - 32 - (tx - 16) - (it.sw !== undefined ? 80 : 20);
+        while (ctx.measureText(sm).width > maxW && sm.length > 4) sm = sm.slice(0, -2);
+        if (sm !== it.summary) sm = sm.trimEnd() + '…';
+        sansText(ctx, sm, tx, yy + 49, 14, SUB, 'left');
+      } else sansText(ctx, it.title, tx, yy + h / 2, 17, INK, 'left');
+      if (it.sw !== undefined) {
+        const sx = W - 32 - 52, sy = yy + h / 2 - 16;
+        rrect(ctx, sx, sy, 52, 32, 16, it.sw ? INK : '#2E2E2E');
+        ctx.fillStyle = it.sw ? '#000' : '#9A9A9A'; ctx.beginPath(); ctx.arc(it.sw ? sx + 36 : sx + 16, sy + 16, it.sw ? 12 : 8, 0, 7); ctx.fill();
+      }
+      yy += h + (last ? 0 : 3);
+    });
+  }
+  ctx.restore();
+}
+(function () {
+  const S = 1.6, W = 400, H = 1190, gap = 50, pad = 40;
+  const ctx = mk('settings', pad * 2 + W * S * 3 + gap * 2, pad * 2 + H * S, PAGE);
+  settingsScreen(ctx, pad, pad, W, H, S, 'SETTINGS', [
+    { items: [
+      { icon: 'ic_mk_language', title: 'Languages', summary: 'English (US)' },
+      { icon: 'ic_mk_tune', title: 'Preferences', summary: 'Number row, letter size, sound and vibration' },
+      { icon: 'ic_mk_palette', title: 'Theme', summary: 'Colors, key shape, font, Rboard themes' } ] },
+    { items: [
+      { icon: 'ic_mk_spell', title: 'Text correction', summary: 'Suggestions, autocorrect, learning' },
+      { icon: 'ic_mk_gesture', title: 'Glide typing', summary: 'Swipe to type, trail, gestures' },
+      { icon: 'ic_mk_mic', title: 'Voice typing', summary: 'Speech engine and options' } ] },
+    { items: [
+      { icon: 'ic_mk_ai', title: 'AI writing', summary: 'Gemini free tier, Groq backup' },
+      { icon: 'ic_mk_gif', title: 'GIFs', summary: 'GIPHY or KLIPY search' },
+      { icon: 'ic_mk_clipboard', title: 'Clipboard', summary: 'History and auto-clear' } ] },
+    { items: [
+      { icon: 'ic_mk_book', title: 'Dictionary', summary: 'Personal dictionary and learned words' },
+      { icon: 'ic_mk_shield', title: 'Privacy', summary: 'Learning, internet access, data' },
+      { icon: 'ic_mk_info', title: 'About', summary: 'Version 1.0' } ] },
+  ], { search: true });
+  settingsScreen(ctx, pad + (W * S + gap), pad, W, H, S, 'AI WRITING', [
+    { title: 'PROVIDER', items: [
+      { title: 'AI writing tools', summary: 'Proofread and rewrite from the toolbar', sw: true },
+      { title: 'Primary', summary: 'Google Gemini (free tier)' },
+      { title: 'Gemini API key', summary: '••••••7Qx2 · Tap to change' },
+      { title: 'Gemini model', summary: 'auto' },
+      { title: 'Switch providers when a limit is hit', summary: 'Uses Groq when Gemini is busy', sw: true },
+      { title: 'Groq API key', summary: '••••••m4Kd · Tap to change' },
+      { title: 'Groq model', summary: 'auto' } ] },
+    { title: 'SAFETY', items: [
+      { title: 'Never in password fields', summary: 'Always on' },
+      { title: 'Only sends text when you tap', summary: 'Nothing is sent automatically.' } ] },
+  ], { back: true });
+  settingsScreen(ctx, pad + (W * S + gap) * 2, pad, W, H, S, 'GIFS', [
+    { title: 'GIF SEARCH', items: [
+      { title: 'GIF button', summary: 'Search GIFs from the toolbar', sw: true },
+      { title: 'Provider', summary: 'GIPHY' },
+      { title: 'GIPHY API key', summary: '••••••Zt9w · Tap to change' },
+      { title: 'KLIPY API key', summary: 'Not set · Free test key from partner.klipy.com' },
+      { title: 'Content filter', summary: 'Moderate (PG-13)' },
+      { title: 'Link fallback', summary: "Paste the link when an app can't take GIFs", sw: true } ] },
+  ], { back: true });
+})();
+
+// 6. Number pad + quick math
+(function () {
+  const S = 2.2, W = 400, th = THEMES.black;
+  const rowsH = 54 * 4 + 8;
+  const ctx = mk('numpad', W * S, (52 + rowsH) * S, PAGE);
+  ctx.save(); ctx.scale(S, S);
+  ctx.fillStyle = th.bg; ctx.fillRect(0, 0, W, 52 + rowsH);
+  // the message being typed: the answer is filled in after "="
+  rrect(ctx, 10, 8, W - 20, 38, 19, '#1E1E1E');
+  const tw = sansText(ctx, '5+5(6/2)=', 26, 27, 18, th.text, 'left', 500);
+  const aw = sansText(ctx, '20', 26 + tw, 27, 18, '#FF6B6B', 'left', 700);
+  ctx.fillStyle = th.text; ctx.fillRect(28 + tw + aw, 17, 1.5, 20);
+  sansText(ctx, 'answer filled in', W - 26, 27, 13, th.sub, 'right');
+  const side = 3, gapX = 6, gapY = 8, unit = (W - side * 2) / 6.65;
+  const cols = [1, 1.55, 1.55, 1.55, 1];
+  const grid = [['', '1', '2', '3', '%'], ['', '4', '5', '6', 'SPACE'], ['', '7', '8', '9', 'BACK']];
+  let y = 56;
+  grid.forEach(row => {
+    let x = side;
+    row.forEach((k, i) => {
+      const w = unit * cols[i];
+      if (k) {
+        const cx = x + w / 2, cy = y + 27;
+        if (k === 'SPACE') { ctx.strokeStyle = th.text; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(cx - 10, cy - 3); ctx.lineTo(cx - 10, cy + 3); ctx.lineTo(cx + 10, cy + 3); ctx.lineTo(cx + 10, cy - 3); ctx.stroke(); }
+        else if (k === 'BACK') icon(ctx, 'BACKSPACE', cx, cy, 46 * 0.6 * 1.08, th.text, true);
+        else dotText(ctx, k, cx, cy, 46 * 0.5 * 1.2, th.text);
+      }
+      x += w;
+    });
+    y += 54;
+  });
+  // operator column spanning three rows
+  ['+', '-', '*', '/'].forEach((k, i) => dotText(ctx, k, side + unit / 2, 56 + 162 / 4 * (i + 0.5), 20, th.text));
+  ctx.fillStyle = th.divider; ctx.fillRect(side + unit - 0.5, 62, 1, 150); ctx.fillRect(side + unit * 5.65 - 0.5, 56, 1, 162);
+  // bottom row
+  const b = [['ABC', 1, 'pill'], [',', .75], ['!?#', 1], ['0', 1.55], ['=', .85], ['.', .5], ['ENTER', 1, 'enter']];
+  let x = side;
+  b.forEach(([k, wgt, kind]) => {
+    const w = unit * wgt, r = { x: x + 3, y: y + 4, w: w - 6, h: 46 };
+    if (kind === 'pill') rrect(ctx, r.x, r.y, r.w, r.h, 23, th.pill);
+    if (kind === 'enter') { rrect(ctx, r.x, r.y, r.w, r.h, 23, th.accent); icon(ctx, 'ENTER', r.x + r.w / 2, r.y + 23, 29, th.onAccent, true); }
+    else dotText(ctx, k, r.x + r.w / 2, r.y + 23, k.length > 2 ? 17 : 27, th.text);
+    x += w;
+  });
+  ctx.restore();
+})();
+window.done = true;
+</script>
+</body></html>
