@@ -161,7 +161,12 @@ class WordEngine(private val context: Context) {
             }
         }
 
-        contraction?.let { if (it !in candidates) candidates[it] = freq(it) }
+        // "dont" → "don't", "im" → "I'm"
+        val typedKnownEarly = isKnown(lower)
+        val contraction = contractions[lower]?.takeIf { !typedKnownEarly || lower in CONTRACTION_TYPOS }
+            ?.takeIf { (userCounts[lower] ?: 0) == 0 }
+        if (contraction != null) candidates[contraction] = (candidates.values.maxOrNull() ?: 0f) + 1f
+
         val filtered = candidates.entries
             .filter { !blockOffensive || it.key !in OFFENSIVE || it.key == lower }
             .sortedByDescending { it.value }
@@ -173,13 +178,7 @@ class WordEngine(private val context: Context) {
         // Autocorrect only when the typed word is unknown (or a learned typo),
         // and the best candidate is clearly a correction, not just a longer completion.
         var auto: String? = null
-        // "dont" → "don't", "im" → "I'm"
-        val typedKnownEarly = isKnown(lower)
-        val contraction = contractions[lower]?.takeIf { !typedKnownEarly || lower in CONTRACTION_TYPOS }
-        if (contraction != null && (userCounts[lower] ?: 0) == 0) {
-            candidates[contraction] = (candidates.values.maxOrNull() ?: 0f) + 1f
-            if (allowAutocorrect) auto = contraction
-        }
+        if (contraction != null && allowAutocorrect) auto = contraction
         // "i" → "I"
         if (auto == null && allowAutocorrect && lower in I_WORDS && typed == lower) auto = lower
         if (auto == null && allowAutocorrect && lower.length >= 2) {
