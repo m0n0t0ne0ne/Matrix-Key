@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.PointF
 import org.json.JSONObject
 import java.io.File
+import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
@@ -136,11 +137,17 @@ class WordEngine(private val context: Context) {
         val idx = lowerBound(lower)
         var i = idx
         var seen = 0
-        while (i < sorted.size && sorted[i].startsWith(lower) && seen < 400) {
+        // Look at every word with this beginning (not just the first few
+        // alphabetically), so common words like "and" or "this" always compete.
+        while (i < sorted.size && sorted[i].startsWith(lower) && seen < 8000) {
             val w = sorted[i]
             if (w != lower) candidates[w] = max(candidates[w] ?: -1e9f, freq(w) + bigramBoost(prev, w) - (w.length - lower.length) * 0.35f - 1.5f)
             i++; seen++
         }
+
+        // The typed word itself competes on equal terms (with a small bonus
+        // for being exactly what was typed), so junk like "th" can't beat "the".
+        if (isKnown(lower)) candidates[lower] = max(candidates[lower] ?: -1e9f, freq(lower) + bigramBoost(prev, lower) + 1f)
 
         // 3. Corrections (keyboard-aware edit distance).
         val maxDist = when {
@@ -271,33 +278,69 @@ class WordEngine(private val context: Context) {
     // Glide typing
     // ------------------------------------------------------------------
 
-    /** Decodes a swipe path into ranked words. Path points are in keyboard coordinates. */
+    /**
+     * Decodes a swipe path into ranked words. Path points are in keyboard coordinates.
+     *
+     * Each candidate word (starting near where the swipe starts and ending near
+     * where it ends) is scored on:
+     *  - elastic shape distance (DTW) between the swipe and the word's key path,
+     *    which tolerates speeding up, slowing down and cutting corners;
+     *  - letters of the word the swipe never came near;
+     *  - parts of the swipe the word doesn't explain;
+     *  - start/end distance and overall length mismatch;
+     *  - how common the word is (and how often you use it / after the previous word).
+     */
     fun decodeGlide(path: List<PointF>, prev: String?, blockOffensive: Boolean): List<String> {
         if (!ready || path.size < 2 || keyCenters.isEmpty()) return emptyList()
-        val n = 40
+        val n = 32
+        val kw = keyWidth
         val user = resample(path, n)
-        val radius = keyWidth * 1.6f
+        val radius = kw * 1.6f
         val startKeys = keyCenters.filter { dist(it.value, path.first()) < radius }.keys
         val endKeys = keyCenters.filter { dist(it.value, path.last()) < radius }.keys
         val pathLen = length(path)
 
         val scored = ArrayList<Pair<String, Float>>()
+        val prevRow = FloatArray(n + 1)
+        val curRow = FloatArray(n + 1)
         for (s in startKeys) for (e in endKeys) {
             val list = byEnds["$s$e"] ?: continue
             for (w in list) {
                 if (w.length < 2) continue
                 val pts = idealPath(w) ?: continue
                 val idealLen = length(pts)
-                // Quick length check before the full comparison.
-                if (idealLen > pathLen * 2.2f + keyWidth * 2 || idealLen < pathLen * 0.35f - keyWidth) continue
+                if (idealLen > pathLen * 2.2f + kw * 2 || idealLen < pathLen * 0.35f - kw) continue
                 val ideal = if (pts.size == 1) List(n) { pts[0] } else resample(pts, n)
-                var sum = 0f
-                for (k in 0 until n) sum += dist(user[k], ideal[k])
-                val shape = sum / n / keyWidth
-                // Every letter should be passed reasonably close to.
-                val miss = coverage(path, pts)
-                val score = -shape * 9f - miss * 6f + freq(w) * 0.9f + bigramBoost(prev, w) +
-                    (if (habitsGlide[w] != null) 4f else 0f)
+
+                // Banded DTW.
+                val band = 6
+                java.util.Arrays.fill(prevRow, Float.MAX_VALUE); prevRow[0] = 0f
+                for (i in 1..n) {
+                    java.util.Arrays.fill(curRow, Float.MAX_VALUE)
+                    val lo = max(1, i - band); val hi = min(n, i + band)
+                    for (j in lo..hi) {
+                        val c = dist(user[i - 1], ideal[j - 1]) / kw
+                        val best = min(prevRow[j], min(prevRow[j - 1], curRow[j - 1]))
+                        curRow[j] = c + best
+                    }
+                    System.arraycopy(curRow, 0, prevRow, 0, n + 1)
+                }
+                val dtw = prevRow[n] / n
+
+                var miss = 0f
+                for (k in pts) {
+                    var best = Float.MAX_VALUE
+                    for (p in user) { val dd = dist(p, k); if (dd < best) best = dd }
+                    miss += max(0f, best / kw - 0.5f)
+                }
+                var extra = 0f
+                for (p in user) extra += max(0f, polyDist(p, pts) / kw - 0.5f)
+                extra = extra / n * 4f
+                val se = (dist(path.first(), pts.first()) + dist(path.last(), pts.last())) / kw
+                val lenPen = abs(ln((idealLen / kw + 0.5f) / (pathLen / kw + 0.5f)))
+
+                val score = -dtw * 6f - miss * 5f - extra * 4f - se * 2f - lenPen * 1.5f +
+                    freq(w) * 0.6f + bigramBoost(prev, w) * 0.8f + (if (habitsGlide[w] != null) 3f else 0f)
                 scored += w to score
             }
         }
@@ -308,6 +351,22 @@ class WordEngine(private val context: Context) {
             .distinct()
             .take(5)
             .toList()
+    }
+
+    /** Distance from a point to a polyline. */
+    private fun polyDist(p: PointF, pts: List<PointF>): Float {
+        if (pts.size == 1) return dist(p, pts[0])
+        var best = Float.MAX_VALUE
+        for (i in 0 until pts.size - 1) {
+            val a = pts[i]; val b = pts[i + 1]
+            val dx = b.x - a.x; val dy = b.y - a.y
+            val l2 = dx * dx + dy * dy
+            val t = if (l2 == 0f) 0f else (((p.x - a.x) * dx + (p.y - a.y) * dy) / l2).coerceIn(0f, 1f)
+            val qx = a.x + t * dx; val qy = a.y + t * dy
+            val dd = sqrt((p.x - qx) * (p.x - qx) + (p.y - qy) * (p.y - qy))
+            if (dd < best) best = dd
+        }
+        return best
     }
 
     private val habitsGlide = HashMap<String, Int>()

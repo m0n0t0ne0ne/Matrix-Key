@@ -764,16 +764,18 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                 else -> listOf(list[1], list[0], list[2])
             }
         }
-        val others = list.filter { !it.equals(typed, true) && it != auto }
         val emoji = if (prefs.emojiSuggestions) EmojiData.forWord(auto ?: typed) else null
-        val third = emoji ?: others.getOrElse(if (auto == null) 1 else 0) { "" }
         return if (auto != null) {
-            listOf("“$typed”", auto, third)
+            val others = list.filter { !it.equals(typed, true) && it != auto }
+            listOf("\u201C$typed\u201D", auto, emoji ?: others.getOrElse(0) { "" })
         } else {
-            val best = if (engine.isKnown(typed) || others.isEmpty()) typed else others[0]
-            val left = if (best == typed) others.getOrElse(0) { "" } else "“$typed”"
-            val right = if (emoji != null) emoji else others.firstOrNull { it != best && it != left } ?: ""
-            listOf(left, best, right)
+            // Middle = the engine's best guess (often a completion of what you're typing).
+            val best = list.firstOrNull() ?: typed
+            val bestIsTyped = best.equals(typed, ignoreCase = true)
+            val rest = list.filter { !it.equals(best, true) && !it.equals(typed, true) }
+            val left = if (bestIsTyped) rest.getOrElse(0) { "" } else "\u201C$typed\u201D"
+            val right = emoji ?: rest.firstOrNull { it != left } ?: ""
+            listOf(left, if (bestIsTyped) typed else best, right)
         }
     }
 
@@ -786,7 +788,9 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         } else {
             topBar.mode = TopBarView.BarMode.SUGGESTIONS
             topBar.suggestions = currentSuggestions
-            topBar.emphasized = if (currentSuggestions.getOrElse(1) { "" }.isNotEmpty() && (autoCorrection != null || composing.isNotEmpty())) 1 else -1
+            // Bold middle = what the space bar will insert (an autocorrection or the typed word).
+            val mid = currentSuggestions.getOrElse(1) { "" }
+            topBar.emphasized = if (mid.isNotEmpty() && (autoCorrection != null || mid == composing.toString())) 1 else -1
         }
     }
 
