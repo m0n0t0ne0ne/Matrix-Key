@@ -79,7 +79,6 @@ class ThemeActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
         themeId = prefs.theme; keyShape = prefs.keyShape; keyFont = prefs.keyFont; accent = prefs.accent
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
         title = com.matrixkey.settings.dotTitle(this, "Theme")
 
         val scroll = ScrollView(this)
@@ -88,6 +87,9 @@ class ThemeActivity : AppCompatActivity() {
             setPadding(px(16f), px(8f), px(16f), px(16f))
         }
         scroll.addView(col)
+        val (pageTop, _) = pageHeader(this, "Theme", showBack = true) { finish() }
+        pageTop.setPadding(0, pageTop.paddingTop, 0, 0)
+        col.addView(pageTop)
 
         col.addView(header("My themes"))
         myThemesRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }

@@ -76,6 +76,37 @@ class PrefsFragment : PreferenceFragmentCompat() {
         listView.clipToPadding = false
         listView.setPadding(0, 0, 0, (32 * resources.displayMetrics.density).toInt())
         setDivider(null)
+        arguments?.getString("highlight")?.let { k -> view.post { highlight(k) } }
+    }
+
+    /** Scrolls to a setting and blinks it (used by search). */
+    fun highlight(key: String?) {
+        if (key.isNullOrEmpty()) return
+        scrollToPreference(key)
+        val pos = flatKeys().indexOf(key)
+        if (pos < 0) return
+        listView.postDelayed({
+            val v = listView.findViewHolderForAdapterPosition(pos)?.itemView ?: return@postDelayed
+            v.animate().alpha(0.25f).setDuration(180).withEndAction {
+                v.animate().alpha(1f).setDuration(180).withEndAction {
+                    v.animate().alpha(0.25f).setDuration(180).withEndAction { v.animate().alpha(1f).setDuration(220) }
+                }
+            }
+        }, 250)
+    }
+
+    private fun flatKeys(): List<String?> {
+        val out = ArrayList<String?>()
+        fun walk(g: androidx.preference.PreferenceGroup) {
+            for (i in 0 until g.preferenceCount) {
+                val p = g.getPreference(i)
+                if (!p.isVisible) continue
+                out += p.key
+                if (p is androidx.preference.PreferenceCategory) walk(p)
+            }
+        }
+        preferenceScreen?.let { walk(it) }
+        return out
     }
 
     /** Visible rows in adapter order: true where the row is a section header. */

@@ -27,6 +27,9 @@
         <item name="android:textColorSecondary">@color/mk_sub</item>
         <item name="actionBarStyle">@style/MatrixKey.ActionBar</item>
         <item name="preferenceTheme">@style/MatrixKey.PreferenceTheme</item>
+        <!-- Pages draw their own big dot-matrix titles, like Nothing OS. -->
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
     </style>
 
     <style name="MatrixKey.ActionBar" parent="Widget.Material3.ActionBar.Solid">

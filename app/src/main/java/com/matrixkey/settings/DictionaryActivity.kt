@@ -42,7 +42,6 @@ class DictionaryActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         title = dotTitle(this, "Dictionary")
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
         engine = WordEngine(this)
 
         val scroll = ScrollView(this)
@@ -51,6 +50,9 @@ class DictionaryActivity : AppCompatActivity() {
             setPadding(px(16f), px(8f), px(16f), px(24f))
         }
         scroll.addView(col)
+        val (pageTop, _) = pageHeader(this, "Dictionary", showBack = true) { finish() }
+        pageTop.setPadding(0, pageTop.paddingTop, 0, 0)
+        col.addView(pageTop)
 
         val addRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         val input = EditText(this).apply {
