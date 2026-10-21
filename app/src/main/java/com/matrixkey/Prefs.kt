@@ -64,10 +64,11 @@ class Prefs(context: Context) {
     // AI
     val ai get() = b("ai", true)
     val aiPrimary get() = s("ai_primary", "gemini")
-    val geminiKey get() = s("gemini_key", "").trim()
-    val geminiModel get() = s("gemini_model", "gemini-2.5-flash").trim().ifEmpty { "gemini-2.5-flash" }
+    val geminiKey get() = s("gemini_key", "").replace(Regex("\\s"), "")
+    /** "auto" = pick the best model the key can use. */
+    val geminiModel get() = s("gemini_model", "auto").trim().ifEmpty { "auto" }
     val aiBackup get() = b("ai_backup", true)
-    val groqKey get() = s("groq_key", "").trim()
+    val groqKey get() = s("groq_key", "").replace(Regex("\\s"), "")
     val groqModel get() = s("groq_model", "llama-3.3-70b-versatile").trim().ifEmpty { "llama-3.3-70b-versatile" }
 
     // GIFs

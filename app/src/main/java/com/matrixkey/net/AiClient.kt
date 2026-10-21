@@ -41,44 +41,105 @@ class AiClient(private val prefs: Prefs) {
         if (available.isEmpty()) throw NoKey()
         val tries = if (prefs.aiBackup) available else available.take(1)
 
-        var last: Exception? = null
+        var first: Exception? = null
         for (p in tries) {
             try {
                 val out = if (p == "gemini") gemini(user) else groq(user)
                 return clean(out)
             } catch (e: Exception) {
-                last = e
-                // Only fall through to the backup on limits / server errors / network trouble.
-                if (e is Http.HttpError && e.code in 400..403 && e.code != 429) break
+                if (first == null) first = e
+                // A rejected key won't get better by trying the backup with the same text.
+                if (e is Http.HttpError && (e.code == 401 || e.code == 403)) break
             }
         }
-        throw last ?: Exception("AI request failed")
+        // Report the primary provider's error: that's the one to fix.
+        throw first ?: Exception("AI request failed")
     }
 
     private fun keyFor(p: String) = if (p == "gemini") prefs.geminiKey else prefs.groqKey
 
+    // ------------------------------------------------------------------
+    // Gemini
+    // ------------------------------------------------------------------
+
+    private val base = "https://generativelanguage.googleapis.com/v1beta"
+    private fun keyHeader() = mapOf("x-goog-api-key" to prefs.geminiKey)
+
+    /** "auto" (or the old built-in default) means: ask Google which models this key can use. */
+    private val autoModel: Boolean
+        get() = prefs.geminiModel.let { it == "auto" || it == "gemini-2.5-flash" }
+
     private fun gemini(user: String): String {
-        val model = prefs.geminiModel
+        if (!autoModel) return geminiCall(prefs.geminiModel, user)
+        val cached = prefs.sp.getString("gemini_resolved_model", null)
+        val model = cached ?: pickModel(null)
+        return try {
+            geminiCall(model, user)
+        } catch (e: Http.HttpError) {
+            // Model retired or not offered to this key: refresh the list and retry once.
+            val modelProblem = e.code == 404 || (e.code == 400 && e.body.contains("model", ignoreCase = true))
+            if (!modelProblem) throw e
+            prefs.sp.edit().remove("gemini_resolved_model").apply()
+            geminiCall(pickModel(model), user)
+        }
+    }
+
+    /**
+     * Lists the models this key can call and picks the newest stable "Flash"
+     * text model (fast, and on the free tier). The choice is remembered.
+     */
+    private fun pickModel(exclude: String?): String {
+        val res = JSONObject(Http.get("$base/models?pageSize=200", keyHeader()))
+        val models = res.optJSONArray("models") ?: JSONArray()
+        val skip = listOf("image", "tts", "audio", "live", "embedding", "thinking", "exp", "learnlm")
+        val usable = ArrayList<String>()
+        for (i in 0 until models.length()) {
+            val m = models.optJSONObject(i) ?: continue
+            val name = m.optString("name").removePrefix("models/")
+            val methods = m.optJSONArray("supportedGenerationMethods")?.toString().orEmpty()
+            val n = name.lowercase()
+            if (!methods.contains("generateContent")) continue
+            if (!n.startsWith("gemini") || !n.contains("flash")) continue
+            if (skip.any { n.contains(it) } || name == exclude) continue
+            usable += name
+        }
+        val versionRx = Regex("gemini-([0-9]+(?:\\.[0-9]+)?)")
+        fun version(n: String) = versionRx.find(n)?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+        val best = usable.sortedWith(
+            compareBy<String>({ it.contains("preview") }, { it.contains("lite") }, { -version(it) }, { it.length })
+        ).firstOrNull() ?: throw Exception("Your Gemini key has no Flash models available")
+        prefs.sp.edit().putString("gemini_resolved_model", best).apply()
+        return best
+    }
+
+    private fun geminiCall(model: String, user: String): String {
         val body = JSONObject().apply {
             put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
             put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", user)))))
             val gen = JSONObject().put("temperature", 0.4)
-            if (model.contains("flash")) gen.put("thinkingConfig", JSONObject().put("thinkingBudget", 0))
+            // Turn off "thinking" on 2.5 Flash for speed (newer models choose their own).
+            if (model.startsWith("gemini-2.5-flash")) gen.put("thinkingConfig", JSONObject().put("thinkingBudget", 0))
             put("generationConfig", gen)
         }
-        val res = JSONObject(
-            Http.post(
-                "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent",
-                body.toString(),
-                mapOf("x-goog-api-key" to prefs.geminiKey)
+        val res = JSONObject(Http.post("$base/models/$model:generateContent", body.toString(), keyHeader()))
+        val cand = res.optJSONArray("candidates")?.optJSONObject(0)
+        val parts = cand?.optJSONObject("content")?.optJSONArray("parts")
+            ?: throw Exception(
+                if (cand?.optString("finishReason") == "SAFETY" || res.has("promptFeedback")) "Gemini declined to rewrite this text"
+                else "Gemini returned no text"
             )
-        )
-        val parts = res.optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
-            ?: throw Exception("Gemini returned no text")
         val sb = StringBuilder()
-        for (i in 0 until parts.length()) sb.append(parts.optJSONObject(i)?.optString("text").orEmpty())
+        for (i in 0 until parts.length()) {
+            val part = parts.optJSONObject(i) ?: continue
+            if (part.optBoolean("thought")) continue
+            sb.append(part.optString("text"))
+        }
         return sb.toString()
     }
+
+    // ------------------------------------------------------------------
+    // Groq
+    // ------------------------------------------------------------------
 
     private fun groq(user: String): String {
         val body = JSONObject().apply {
@@ -107,12 +168,25 @@ class AiClient(private val prefs: Prefs) {
     }
 
     companion object {
-        fun friendlyError(e: Throwable): String = when {
-            e is NoKey -> e.message ?: "Add an API key"
-            e is Http.HttpError && e.code == 429 -> "Free limit reached. Try again in a minute."
-            e is Http.HttpError && (e.code == 400 || e.code == 401 || e.code == 403) -> "The API key was rejected. Check it in Settings › AI writing."
-            e is java.net.UnknownHostException -> "No internet connection"
-            else -> "Couldn't reach the AI service"
+        fun friendlyError(e: Throwable): String {
+            val server = (e as? Http.HttpError)?.let { serverMessage(it.body) }.orEmpty()
+            val main = when {
+                e is NoKey -> e.message ?: "Add an API key"
+                e is Http.HttpError && e.code == 429 -> "Free limit reached. Try again in a minute."
+                e is Http.HttpError && (e.code == 401 || e.code == 403) -> "The API key was rejected (${e.code}). Check it in Settings › AI writing."
+                e is Http.HttpError && e.code == 400 && server.contains("API key", ignoreCase = true) -> "The API key isn't valid. Check it in Settings › AI writing."
+                e is Http.HttpError -> "The AI service returned an error (${e.code})."
+                e is java.net.UnknownHostException -> "No internet connection"
+                e is java.net.SocketTimeoutException -> "The AI service took too long to answer. Try again."
+                else -> e.message?.takeIf { it.isNotBlank() } ?: "Couldn't reach the AI service"
+            }
+            return if (server.isNotBlank()) "$main\n\n“$server”" else main
         }
+
+        /** The human-readable message inside a Gemini/Groq error response. */
+        private fun serverMessage(body: String): String = runCatching {
+            val o = JSONObject(body)
+            (o.optJSONObject("error")?.optString("message") ?: o.optString("message")).orEmpty().take(200)
+        }.getOrDefault("")
     }
 }

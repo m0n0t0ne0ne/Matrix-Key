@@ -25,7 +25,8 @@
         <EditTextPreference
             android:key="gemini_model"
             android:title="Gemini model"
-            android:defaultValue="gemini-2.5-flash"
+            android:defaultValue="auto"
+            android:dialogMessage="Leave as auto to use the newest Flash model your key allows, or type an exact model ID."
             app:useSimpleSummaryProvider="true"
             app:iconSpaceReserved="false" />
         <SwitchPreferenceCompat
