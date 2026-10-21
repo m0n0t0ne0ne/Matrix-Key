@@ -2,9 +2,10 @@ package com.matrixkey.keyboard
 
 import android.graphics.RectF
 
-enum class KeyType { CHAR, SHIFT, BACKSPACE, ENTER, SPACE, SYMBOLS, ALPHA, MORE_SYMBOLS, EMOJI, SPACER }
+enum class KeyType { CHAR, SHIFT, BACKSPACE, ENTER, SPACE, SYMBOLS, ALPHA, MORE_SYMBOLS, NUMPAD, EMOJI, SPACER }
 
-enum class Mode { ALPHA, SYMBOLS, MORE_SYMBOLS, NUMBER }
+/** NUMBER is for number/phone fields; NUMPAD is the number pad you open with the 1234 key. */
+enum class Mode { ALPHA, SYMBOLS, MORE_SYMBOLS, NUMBER, NUMPAD }
 
 enum class ShiftState { OFF, ON, LOCKED }
 
@@ -81,6 +82,7 @@ object Layouts {
         Mode.SYMBOLS -> symbols(o)
         Mode.MORE_SYMBOLS -> moreSymbols(o)
         Mode.NUMBER -> number()
+        Mode.NUMPAD -> numpad()
     }
 
     private fun numberRow() = Row("1234567890".map {
@@ -122,8 +124,11 @@ object Layouts {
         keys += if (alphaMode) Key(KeyType.SYMBOLS, symbolsLabel, weight = 1.5f, mod = true, pill = true)
         else Key(KeyType.ALPHA, "ABC", weight = 1.5f, mod = true, pill = true)
         keys += Key(KeyType.CHAR, ",", mod = true, more = listOf(";", ":"))
+        // On the symbol pages, a 1234 key opens the number pad.
+        if (!alphaMode) keys += Key(KeyType.NUMPAD, "1234", mod = true)
         if (o.emojiKey) keys += Key(KeyType.EMOJI, mod = true)
-        keys += Key(KeyType.SPACE, weight = if (o.emojiKey) 4.5f else 5.5f, pill = true)
+        val space = (if (o.emojiKey) 4.5f else 5.5f) - (if (alphaMode) 0f else 1f)
+        keys += Key(KeyType.SPACE, weight = space, pill = true)
         keys += Key(KeyType.CHAR, ".", mod = true, more = listOf("…", "?", "!", "-", "'", "\"", "/", "@"))
         keys += Key(KeyType.ENTER, weight = 1.5f, pill = true)
         return Row(keys, LETTER_ROW_DP)
@@ -155,6 +160,21 @@ object Layouts {
         ),
         bottomRow(o, "?123", alphaMode = false),
     )
+
+    /** Calculator-style pad: operators on the left, then 1-9, 0 at the bottom. */
+    private fun numpad(): List<Row> {
+        fun op(s: String, vararg more: String) = Key(KeyType.CHAR, s, mod = true, more = more.toList())
+        fun d(s: String) = Key(KeyType.CHAR, s, weight = 1.4f, more = numberHints[s] ?: emptyList())
+        return listOf(
+            Row(listOf(op("+", "±"), d("1"), d("2"), d("3"), op("/", "%", "÷")), LETTER_ROW_DP),
+            Row(listOf(op("-", "_", "–"), d("4"), d("5"), d("6"), Key(KeyType.SPACE, pill = true)), LETTER_ROW_DP),
+            Row(listOf(op("*", "×", "%", "^"), d("7"), d("8"), d("9"), Key(KeyType.BACKSPACE, mod = true)), LETTER_ROW_DP),
+            Row(listOf(Key(KeyType.ALPHA, "ABC", mod = true, pill = true),
+                Key(KeyType.CHAR, ",", weight = 1.4f, mod = true), d("0"),
+                Key(KeyType.CHAR, ".", weight = 1.4f, mod = true, more = listOf("=", "#", "(", ")")),
+                Key(KeyType.ENTER, pill = true)), LETTER_ROW_DP),
+        )
+    }
 
     private fun number(): List<Row> = listOf(
         Row(listOf("1", "2", "3", "-").map { Key(KeyType.CHAR, it, mod = it == "-") }, LETTER_ROW_DP),

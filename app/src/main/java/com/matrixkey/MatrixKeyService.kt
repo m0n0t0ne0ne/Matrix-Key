@@ -457,6 +457,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             }
             KeyType.SYMBOLS -> setMode(Mode.SYMBOLS)
             KeyType.MORE_SYMBOLS -> setMode(Mode.MORE_SYMBOLS)
+            KeyType.NUMPAD -> setMode(Mode.NUMPAD)
             KeyType.ALPHA -> { setMode(Mode.ALPHA); updateShiftFromField() }
             KeyType.EMOJI -> showEmoji()
             else -> {}

@@ -188,6 +188,17 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
             KeyType.ENTER -> Icons.draw(canvas, enterIcon, cx, cy, iconSize * 1.05f, fg, dottedIcons)
             KeyType.EMOJI -> Icons.draw(canvas, Icon.EMOJI, cx, cy, iconSize, fg, dottedIcons)
             KeyType.SPACE -> {}
+            KeyType.NUMPAD -> {
+                // "12" over "34", like a little number pad.
+                label.typeface = typeface
+                label.color = fg
+                label.textSize = k.rect.height() * 0.28f * (1f + (textScale - 1f) * 0.5f)
+                val fm = label.fontMetrics
+                val lh = (fm.descent - fm.ascent) * 0.92f
+                val base = cy - (fm.ascent + fm.descent) / 2
+                canvas.drawText("12", cx, base - lh / 2, label)
+                canvas.drawText("34", cx, base + lh / 2, label)
+            }
             else -> {
                 var text = k.label
                 if (k.isLetter && shift != ShiftState.OFF) text = text.uppercase()
