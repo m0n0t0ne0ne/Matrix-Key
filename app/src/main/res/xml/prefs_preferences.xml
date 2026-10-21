@@ -37,8 +37,16 @@
             app:useSimpleSummaryProvider="true"
             app:iconSpaceReserved="false" />
         <ListPreference
+            android:key="key_text_size"
+            android:title="Key letter size"
+            android:defaultValue="1.2"
+            android:entries="@array/text_size_entries"
+            android:entryValues="@array/text_size_values"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+        <ListPreference
             android:key="kb_height"
-            android:title="Keyboard height"
+            android:title="Keyboard height (bigger keys = bigger letters)"
             android:defaultValue="1.0"
             android:entries="@array/height_entries"
             android:entryValues="@array/height_values"

@@ -261,6 +261,8 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         keyboard.feedback.strength = prefs.vibrationStrength
         keyboard.feedback.soundEnabled = prefs.sound
         keyboard.feedback.volume = prefs.soundVolume
+        keyboard.textScale = prefs.keyTextScale
+        topBar.onTapFeedback = { keyboard.feedback.key(topBar) }
 
         overlay.trailColor = when (prefs.trailColor) {
             "text" -> theme.text
@@ -743,6 +745,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     }
 
     private fun showToolbarOrSuggestions() {
+        if (panel != null) { topBar.mode = TopBarView.BarMode.TOOLBAR; return }
         val empty = currentSuggestions.all { it.isEmpty() }
         val wantToolbar = showToolbar || (empty && prefs.toolbar && composing.isEmpty())
         if (wantToolbar && !isPassword) {
@@ -854,14 +857,13 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         }
     }
 
-    override fun onSearchClose() {
-        val t = target
-        closeTarget()
-        when (t) {
-            Target.GIF_SEARCH -> gifPanel?.let { showPanelView(it) }
-            Target.AI_PROMPT -> aiPanel?.let { showPanelView(it) }
-            Target.NONE -> {}
-        }
+    /** The keyboard button in the search line goes straight back to typing. */
+    override fun onSearchClose() = onBackToKeyboard()
+
+    override fun onBackToKeyboard() {
+        closeTarget(redraw = false)
+        if (voice.listening) voice.stop()
+        closePanels()
     }
 
     override fun onMessageClose() {
@@ -901,7 +903,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     // Panels
     // ------------------------------------------------------------------
 
-    private fun ui() = PanelUi(this, theme, FontManager.keyTypeface(this, prefs.keyFont))
+    private fun ui() = PanelUi(this, theme, FontManager.keyTypeface(this, prefs.keyFont)) { v -> keyboard.feedback.key(v) }
 
     private fun showPanelView(v: View) {
         val h = keyboard.height.takeIf { it > 0 } ?: keyboard.measuredHeight
@@ -910,11 +912,22 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         content.addView(v, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, h))
         keyboard.visibility = View.INVISIBLE
         panel = v
+        // Keep the toolbar up, with a keyboard button to get back to the keys.
+        topBar.activeTool = when (v) {
+            is EmojiPanel -> TopBarView.Tool.EMOJI
+            is GifPanel -> TopBarView.Tool.GIF
+            is ClipboardPanel -> TopBarView.Tool.CLIPBOARD
+            is AiPanel -> TopBarView.Tool.AI
+            else -> null
+        }
+        topBar.panelOpen = true
+        topBar.mode = TopBarView.BarMode.TOOLBAR
     }
 
     private fun hidePanel() {
         panel?.let { content.removeView(it) }
         panel = null
+        if (::topBar.isInitialized) { topBar.panelOpen = false; topBar.activeTool = null }
         if (::keyboard.isInitialized) keyboard.visibility = View.VISIBLE
     }
 

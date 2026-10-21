@@ -14,7 +14,13 @@ import androidx.core.graphics.ColorUtils
 import com.matrixkey.theme.KeyboardTheme
 
 /** Small helpers so every panel is styled from the same keyboard theme. */
-class PanelUi(val context: Context, val theme: KeyboardTheme, val dotTypeface: Typeface) {
+class PanelUi(
+    val context: Context,
+    val theme: KeyboardTheme,
+    val dotTypeface: Typeface,
+    /** Haptic feedback for taps inside panels. */
+    val haptic: (View) -> Unit = {},
+) {
     val dp = context.resources.displayMetrics.density
     fun px(v: Float) = (v * dp).toInt()
 
@@ -53,7 +59,7 @@ class PanelUi(val context: Context, val theme: KeyboardTheme, val dotTypeface: T
         minHeight = px(40f)
         minimumHeight = px(40f)
         pressable(this, if (filled) theme.accent else theme.key, 20f)
-        setOnClickListener { onClick() }
+        setOnClickListener { haptic(this); onClick() }
     }
 
     fun row(): LinearLayout = LinearLayout(context).apply {

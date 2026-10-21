@@ -51,7 +51,7 @@ class GifPanel(
             setPadding(ui.px(16f), 0, ui.px(16f), 0)
             setTextColor(ui.theme.sub)
             ui.pressable(this, ui.theme.key, 20f)
-            setOnClickListener { onSearchTap() }
+            setOnClickListener { ui.haptic(it); onSearchTap() }
         }
         header.addView(searchPill, LayoutParams(0, ui.px(40f), 1f))
         addView(header, LayoutParams(LayoutParams.MATCH_PARENT, ui.px(48f)))
@@ -112,7 +112,7 @@ class GifPanel(
                 contentDescription = "GIF"
                 clipToOutline = true
                 background = ui.rounded(ui.theme.key, 10f)
-                setOnClickListener { onSend(g) }
+                setOnClickListener { ui.haptic(it); onSend(g) }
             }
             val target = if (lh <= rh) left.also { lh += h } else right.also { rh += h }
             target.addView(iv, LayoutParams(LayoutParams.MATCH_PARENT, h.toInt()).apply { setMargins(ui.px(3f), ui.px(3f), ui.px(3f), ui.px(3f)) })

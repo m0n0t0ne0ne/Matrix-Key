@@ -25,6 +25,7 @@ class Prefs(context: Context) {
     val emojiKey get() = b("emoji_key", true)
     val toolbar get() = b("toolbar", true)
     val oneHanded get() = s("one_handed", "off")
+    val keyTextScale get() = s("key_text_size", "1.2").toFloatOrNull() ?: 1.2f
     val heightScale get() = s("kb_height", "1.0").toFloatOrNull() ?: 1f
     val sound get() = b("sound", false)
     val soundVolume get() = i("sound_volume", 40)

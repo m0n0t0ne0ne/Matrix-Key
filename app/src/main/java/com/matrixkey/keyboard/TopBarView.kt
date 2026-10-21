@@ -29,7 +29,18 @@ class TopBarView(context: Context) : View(context) {
         fun onSearchSubmit()
         fun onSearchClose()
         fun onMessageClose()
+        /** Close any open panel (emoji, GIFs, clipboard, AI) and show the keys. */
+        fun onBackToKeyboard()
     }
+
+    /** True while a panel replaces the keys: the left button then returns to the keyboard. */
+    var panelOpen = false
+        set(v) { field = v; invalidate() }
+    /** The tool whose panel is open (drawn highlighted; tapping it again closes it). */
+    var activeTool: Tool? = null
+        set(v) { field = v; invalidate() }
+    /** Called on every successful tap, for haptic feedback. */
+    var onTapFeedback: (() -> Unit)? = null
 
     var listener: Listener? = null
     lateinit var theme: KeyboardTheme
@@ -144,7 +155,7 @@ class TopBarView(context: Context) : View(context) {
 
     private fun drawToolbar(canvas: Canvas) {
         val t = theme
-        roundButton(canvas, leftBtn, Icon.CHEVRON_LEFT, t.chip, t.text)
+        roundButton(canvas, leftBtn, if (panelOpen) Icon.KEYBOARD else Icon.CHEVRON_LEFT, t.chip, t.text)
         tools.forEachIndexed { i, tool ->
             val icon = when (tool) {
                 Tool.EMOJI -> Icon.EMOJI
@@ -154,13 +165,14 @@ class TopBarView(context: Context) : View(context) {
                 Tool.SETTINGS -> Icon.SETTINGS
                 Tool.MIC -> Icon.MIC
             }
-            roundButton(canvas, toolRects[i], icon, if (tool == Tool.MIC) t.pill else null, t.text)
+            val active = tool == activeTool
+            roundButton(canvas, toolRects[i], icon, if (active) t.accent else if (tool == Tool.MIC) t.pill else null, if (active) t.onAccent else t.text)
         }
     }
 
     private fun drawSearch(canvas: Canvas) {
         val t = theme
-        roundButton(canvas, leftBtn, Icon.CLOSE, t.chip, t.text)
+        roundButton(canvas, leftBtn, Icon.KEYBOARD, t.chip, t.text)
         // The box is outlined in the accent color so it's clearly the field
         // being typed into (Android doesn't let a keyboard hide the app's own cursor).
         fill.color = t.key
@@ -250,6 +262,9 @@ class TopBarView(context: Context) : View(context) {
                 invalidate()
                 if (target == null || hitTarget(e.x, e.y) !== target) return true
                 val long = SystemClock.uptimeMillis() - downTime > longPressMs
+                val isBlankSlot = mode == BarMode.SUGGESTIONS && slots.any { it === target } &&
+                    suggestions.getOrElse(slots.indexOfFirst { it === target }) { "" }.isEmpty()
+                if (!isBlankSlot) onTapFeedback?.invoke()
                 click(target, long)
             }
             MotionEvent.ACTION_CANCEL -> { pressed = null; invalidate() }
@@ -268,9 +283,11 @@ class TopBarView(context: Context) : View(context) {
                     if (i >= 0 && suggestions[i].isNotEmpty()) if (long) l.onSuggestionLongPress(i) else l.onSuggestion(i)
                 }
             }
-            BarMode.TOOLBAR -> if (target === leftBtn) l.onToggleToolbar() else {
+            BarMode.TOOLBAR -> if (target === leftBtn) {
+                if (panelOpen) l.onBackToKeyboard() else l.onToggleToolbar()
+            } else {
                 val i = toolRects.indexOfFirst { it === target }
-                if (i >= 0) l.onTool(tools[i])
+                if (i >= 0) { if (panelOpen && tools[i] == activeTool) l.onBackToKeyboard() else l.onTool(tools[i]) }
             }
             BarMode.SEARCH -> if (target === leftBtn) l.onSearchClose() else l.onSearchSubmit()
             BarMode.MESSAGE -> if (target === leftBtn) l.onMessageClose()

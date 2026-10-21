@@ -54,6 +54,8 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
     var showHints = true
     var popupEnabled = true
     var heightScale = 1f
+    /** Letter size multiplier (Settings › Preferences › Key letter size). */
+    var textScale = 1.2f
     var oneHanded = "off"
     var shift = ShiftState.OFF
         set(value) { field = value; invalidate() }
@@ -190,16 +192,20 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
                 label.typeface = typeface
                 label.color = fg
                 label.textSize = when {
-                    text.length > 2 -> k.rect.height() * 0.32f
+                    text.length > 2 -> k.rect.height() * 0.32f * (1f + (textScale - 1f) * 0.5f)
                     k.type == KeyType.CHAR && k.label in listOf(",", ".") -> k.rect.height() * 0.55f
-                    else -> k.rect.height() * if (dotStyle) 0.5f else 0.46f
+                    else -> k.rect.height() * (if (dotStyle) 0.5f else 0.46f) * textScale
                 }
+                // Never wider than the key.
+                val maxW = k.rect.width() * 0.86f
+                val w = label.measureText(text)
+                if (w > maxW) label.textSize *= maxW / w
                 val fm = label.fontMetrics
                 canvas.drawText(text, cx, cy - (fm.ascent + fm.descent) / 2, label)
                 if (showHints && k.hint != null && mode == Mode.ALPHA) {
                     hintPaint.typeface = typeface
                     hintPaint.color = t.sub
-                    hintPaint.textSize = k.rect.height() * 0.24f
+                    hintPaint.textSize = k.rect.height() * 0.24f * (1f + (textScale - 1f) * 0.4f)
                     canvas.drawText(k.hint, k.rect.right - 3 * dp, k.rect.top + hintPaint.textSize + 1 * dp, hintPaint)
                 }
             }

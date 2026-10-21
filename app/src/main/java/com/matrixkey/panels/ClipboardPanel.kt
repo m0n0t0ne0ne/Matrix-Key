@@ -62,8 +62,8 @@ class ClipboardPanel(
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(ui.px(14f), ui.px(12f), ui.px(14f), ui.px(12f))
                 ui.pressable(this, ui.theme.key, 14f)
-                setOnClickListener { onPaste(item.text) }
-                setOnLongClickListener { store.togglePin(item); refresh(); true }
+                setOnClickListener { ui.haptic(it); onPaste(item.text) }
+                setOnLongClickListener { ui.haptic(it); store.togglePin(item); refresh(); true }
             }
             list.addView(tv, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
                 setMargins(0, ui.px(4f), 0, ui.px(4f))

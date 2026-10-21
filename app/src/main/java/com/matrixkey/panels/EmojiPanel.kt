@@ -67,7 +67,7 @@ class EmojiPanel(
                 gravity = Gravity.CENTER
                 setPadding(ui.px(10f), 0, ui.px(10f), 0)
                 contentDescription = name
-                setOnClickListener { scroll.smoothScrollTo(0, sectionTops.getOrElse(i) { 0 }) }
+                setOnClickListener { ui.haptic(it); scroll.smoothScrollTo(0, sectionTops.getOrElse(i) { 0 }) }
             }
             tabs.addView(tab, LayoutParams(LayoutParams.WRAP_CONTENT, ui.px(40f)))
         }
@@ -81,12 +81,13 @@ class EmojiPanel(
         }
         ui.pressable(back, ui.theme.mod, 20f)
         back.contentDescription = "Backspace"
-        back.setOnClickListener { onBackspace() }
+        back.setOnClickListener { ui.haptic(it); onBackspace() }
         bar.addView(back, LayoutParams(ui.px(56f), ui.px(40f)))
         return bar
     }
 
     private fun picked(e: String) {
+        ui.haptic(this)
         recents.remove(e)
         recents.add(0, e)
         while (recents.size > 32) recents.removeAt(recents.size - 1)
