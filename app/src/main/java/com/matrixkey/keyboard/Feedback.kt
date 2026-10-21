@@ -46,14 +46,24 @@ class Feedback(context: Context) {
         }
     }
 
+    private val hasAmplitude: Boolean by lazy { vibrator?.hasAmplitudeControl() == true }
+
+    /**
+     * Key press. The strength slider maps to both how long and how hard the
+     * motor runs (8–28 ms, amplitude 90–255), so the top of the slider is a
+     * firm, clearly felt click on Nothing's motor.
+     */
     private fun click(view: View) {
         val v = vibrator
-        val scale = (strength / 100f).coerceIn(0.05f, 1f)
+        val s = (strength / 100f).coerceIn(0f, 1f)
         if (v != null && v.hasVibrator()) {
-            if (supportsPrimitives && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                v.vibrate(VibrationEffect.startComposition().addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, scale).compose())
+            val ms = (8 + 20 * s).toLong()
+            val amp = if (hasAmplitude) (90 + 165 * s).toInt().coerceIn(1, 255) else VibrationEffect.DEFAULT_AMPLITUDE
+            if (s < 0.25f && supportsPrimitives && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                // Very light settings: the motor's own crisp click primitive.
+                v.vibrate(VibrationEffect.startComposition().addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, (0.4f + s * 2.4f).coerceAtMost(1f)).compose())
             } else {
-                v.vibrate(VibrationEffect.createOneShot(12, (scale * 255).toInt().coerceIn(1, 255)))
+                v.vibrate(VibrationEffect.createOneShot(ms, amp))
             }
         } else {
             view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
@@ -68,15 +78,11 @@ class Feedback(context: Context) {
     fun tick(view: View) {
         if (!hapticEnabled) return
         val v = vibrator
-        val scale = (strength / 100f).coerceIn(0.05f, 1f)
+        val s = (strength / 100f).coerceIn(0f, 1f)
         if (v != null && v.hasVibrator()) {
-            if (supportsPrimitives && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                v.vibrate(VibrationEffect.startComposition().addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, scale).compose())
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                v.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
-            } else {
-                v.vibrate(VibrationEffect.createOneShot(5, (scale * 200).toInt().coerceIn(1, 255)))
-            }
+            val ms = (4 + 8 * s).toLong()
+            val amp = if (hasAmplitude) (80 + 175 * s).toInt().coerceIn(1, 255) else VibrationEffect.DEFAULT_AMPLITUDE
+            v.vibrate(VibrationEffect.createOneShot(ms, amp))
         } else {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
         }

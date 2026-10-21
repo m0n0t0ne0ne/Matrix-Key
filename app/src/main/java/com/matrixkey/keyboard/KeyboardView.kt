@@ -49,6 +49,8 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
     lateinit var theme: KeyboardTheme
     var typeface: Typeface = Typeface.DEFAULT
     var dotStyle = true
+    /** Draw shift/backspace/enter/emoji as dot-matrix icons instead of solid ones. */
+    var dottedIcons = false
     /** "rounded" | "rectangular" | "none" */
     var keyShape = "none"
     var showHints = true
@@ -176,15 +178,15 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
         val fg = if (k.type == KeyType.ENTER) t.onAccent else t.text
         val cx = k.rect.centerX()
         val cy = k.rect.centerY()
-        val iconSize = k.rect.height() * 0.5f
+        val iconSize = k.rect.height() * 0.6f
         when (k.type) {
             KeyType.SHIFT -> Icons.draw(
-                canvas, if (shift == ShiftState.LOCKED) Icon.CAPS else Icon.SHIFT, cx, cy, iconSize, fg, dotStyle,
+                canvas, if (shift == ShiftState.LOCKED) Icon.CAPS else Icon.SHIFT, cx, cy, iconSize, fg, dottedIcons,
                 filledShift = shift == ShiftState.ON
             )
-            KeyType.BACKSPACE -> Icons.draw(canvas, Icon.BACKSPACE, cx, cy, iconSize * 1.08f, fg, dotStyle)
-            KeyType.ENTER -> Icons.draw(canvas, enterIcon, cx, cy, iconSize * 1.05f, fg, dotStyle)
-            KeyType.EMOJI -> Icons.draw(canvas, Icon.EMOJI, cx, cy, iconSize, fg, dotStyle)
+            KeyType.BACKSPACE -> Icons.draw(canvas, Icon.BACKSPACE, cx, cy, iconSize * 1.08f, fg, dottedIcons)
+            KeyType.ENTER -> Icons.draw(canvas, enterIcon, cx, cy, iconSize * 1.05f, fg, dottedIcons)
+            KeyType.EMOJI -> Icons.draw(canvas, Icon.EMOJI, cx, cy, iconSize, fg, dottedIcons)
             KeyType.SPACE -> {}
             else -> {
                 var text = k.label

@@ -15,6 +15,12 @@
             android:defaultValue="true"
             app:iconSpaceReserved="false" />
         <SwitchPreferenceCompat
+            android:key="dotted_icons"
+            android:title="Dot-matrix key icons"
+            android:summary="Draw shift, backspace and enter as dots instead of solid icons"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
             android:key="emoji_key"
             android:title="Emoji switch key"
             android:summary="Show the emoji key next to space"

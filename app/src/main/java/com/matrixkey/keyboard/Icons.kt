@@ -29,13 +29,13 @@ object Icons {
         addRoundRect(RectF(l, t, r, b), rad, rad, Path.Direction.CW)
 
     private val strokes: Map<Icon, Path> = mapOf(
-        Icon.SHIFT to p { moveTo(5.5f, 15.5f); lineTo(12f, 9f); lineTo(18.5f, 15.5f) },
-        Icon.CAPS to p { moveTo(5.5f, 13.5f); lineTo(12f, 7f); lineTo(18.5f, 13.5f); moveTo(7f, 18f); lineTo(17f, 18f) },
+        Icon.SHIFT to p { moveTo(12f, 3.5f); lineTo(3.5f, 12f); lineTo(8.5f, 12f); lineTo(8.5f, 19.5f); lineTo(15.5f, 19.5f); lineTo(15.5f, 12f); lineTo(20.5f, 12f); close() },
+        Icon.CAPS to p { moveTo(12f, 2.5f); lineTo(3.5f, 11f); lineTo(8.5f, 11f); lineTo(8.5f, 16.5f); lineTo(15.5f, 16.5f); lineTo(15.5f, 11f); lineTo(20.5f, 11f); close(); moveTo(8.5f, 20.5f); lineTo(15.5f, 20.5f) },
         Icon.BACKSPACE to p {
             moveTo(9f, 6f); lineTo(20.5f, 6f); lineTo(20.5f, 18f); lineTo(9f, 18f); lineTo(3.5f, 12f); close()
             moveTo(12f, 9.5f); lineTo(17f, 14.5f); moveTo(17f, 9.5f); lineTo(12f, 14.5f)
         },
-        Icon.ENTER to p { moveTo(19f, 5.5f); lineTo(19f, 12f); lineTo(5.5f, 12f); moveTo(9.5f, 8f); lineTo(5.5f, 12f); lineTo(9.5f, 16f) },
+        Icon.ENTER to p { moveTo(19.5f, 6f); lineTo(19.5f, 12.5f); lineTo(5f, 12.5f); moveTo(9.5f, 8f); lineTo(5f, 12.5f); lineTo(9.5f, 17f) },
         Icon.SEARCH to p { circle(10.5f, 10.5f, 6.5f); moveTo(15.5f, 15.5f); lineTo(20.5f, 20.5f) },
         Icon.SEND to p { moveTo(4f, 12f); lineTo(20f, 12f); moveTo(14f, 6f); lineTo(20f, 12f); lineTo(14f, 18f) },
         Icon.NEXT to p { moveTo(5f, 12f); lineTo(18f, 12f); moveTo(13f, 7f); lineTo(18f, 12f); lineTo(13f, 17f) },
@@ -54,11 +54,35 @@ object Icons {
         Icon.GRID to p { roundRect(4f, 4f, 11f, 11f, 2f); roundRect(13f, 4f, 20f, 11f, 2f); roundRect(4f, 13f, 11f, 20f, 2f); roundRect(13f, 13f, 20f, 20f, 2f) },
     )
 
-    /** Parts that are always filled (eyes, mic capsule, gear teeth). */
+    /** Parts that are always filled (eyes, mic capsule). */
     private val fills: Map<Icon, Path> = mapOf(
         Icon.EMOJI to p { circle(9f, 10f, 1.4f); circle(15f, 10f, 1.4f) },
         Icon.MIC to p { roundRect(9f, 3f, 15f, 14f, 3f) },
     )
+
+    /** Solid (Gboard-style) icons drawn as one filled shape instead of strokes. */
+    private val solidFills: Map<Icon, Path> = mapOf(
+        Icon.GRID to p { roundRect(3.5f, 3.5f, 10.5f, 10.5f, 2.2f); roundRect(13.5f, 3.5f, 20.5f, 10.5f, 2.2f); roundRect(3.5f, 13.5f, 10.5f, 20.5f, 2.2f); roundRect(13.5f, 13.5f, 20.5f, 20.5f, 2.2f) },
+        Icon.SETTINGS to gear(),
+    )
+
+    /** A filled gear with a round hole, like Material's settings icon. */
+    private fun gear(): Path {
+        val path = Path()
+        val teeth = 8
+        val outer = 10.2f; val inner = 7.6f
+        val steps = teeth * 4
+        for (i in 0..steps) {
+            val a = (Math.PI * 2 * i / steps - Math.PI / 2 + Math.PI / steps).toFloat()
+            val r = if ((i / 2) % 2 == 0) outer else inner
+            val x = 12f + r * kotlin.math.cos(a); val y = 12f + r * kotlin.math.sin(a)
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
+        path.addCircle(12f, 12f, 3.3f, Path.Direction.CW)
+        path.fillType = Path.FillType.EVEN_ODD
+        return path
+    }
 
     fun draw(canvas: Canvas, icon: Icon, cx: Float, cy: Float, size: Float, color: Int, dotted: Boolean, filledShift: Boolean = false) {
         val scale = size / 24f
@@ -67,6 +91,15 @@ object Icons {
         matrix.postTranslate(cx - 12f * scale, cy - 12f * scale)
 
         paint.color = color
+        val solid = if (!dotted) solidFills[icon] else null
+        if (solid != null) {
+            tmp.reset()
+            solid.transform(matrix, tmp)
+            tmp.fillType = solid.fillType
+            paint.style = Paint.Style.FILL
+            canvas.drawPath(tmp, paint)
+            return
+        }
         strokes[icon]?.let { src ->
             tmp.reset()
             src.transform(matrix, tmp)
@@ -76,12 +109,16 @@ object Icons {
                 paint.pathEffect = DashPathEffect(floatArrayOf(0.01f, 3.4f * scale), 0f)
             } else {
                 paint.strokeWidth = 2f * scale
-                paint.pathEffect = if (icon == Icon.SETTINGS) null else null
+                paint.pathEffect = null
             }
             if (icon == Icon.SETTINGS) {
-                // Gear: dashed thick ring reads as teeth.
+                // Dotted gear: a dashed thick ring reads as teeth.
                 paint.strokeWidth = 3.2f * scale
                 paint.pathEffect = DashPathEffect(floatArrayOf(2.6f * scale, 1.9f * scale), 0f)
+            }
+            if ((icon == Icon.SHIFT && filledShift) || icon == Icon.CAPS) {
+                paint.style = Paint.Style.FILL_AND_STROKE
+                paint.pathEffect = null
             }
             canvas.drawPath(tmp, paint)
             paint.pathEffect = null
@@ -89,12 +126,6 @@ object Icons {
         fills[icon]?.let { src ->
             tmp.reset()
             src.transform(matrix, tmp)
-            paint.style = Paint.Style.FILL
-            canvas.drawPath(tmp, paint)
-        }
-        if (icon == Icon.SHIFT && filledShift) {
-            tmp.reset()
-            p { moveTo(5.5f, 15.5f); lineTo(12f, 9f); lineTo(18.5f, 15.5f); close() }.transform(matrix, tmp)
             paint.style = Paint.Style.FILL
             canvas.drawPath(tmp, paint)
         }

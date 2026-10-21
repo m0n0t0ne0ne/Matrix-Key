@@ -35,7 +35,7 @@ class Row(val keys: List<Key>, val heightDp: Float)
 
 object Layouts {
     const val LETTER_ROW_DP = 54f
-    const val NUMBER_ROW_DP = 44f
+    const val NUMBER_ROW_DP = 50f
 
     private val letterRows = mapOf(
         "qwerty" to listOf("qwertyuiop", "asdfghjkl", "zxcvbnm"),

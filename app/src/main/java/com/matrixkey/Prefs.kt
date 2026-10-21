@@ -22,6 +22,7 @@ class Prefs(context: Context) {
     val layout get() = s("layout", "qwerty")
     val numberRow get() = b("number_row", true)
     val symbolHints get() = b("symbol_hints", true)
+    val dottedIcons get() = b("dotted_icons", false)
     val emojiKey get() = b("emoji_key", true)
     val toolbar get() = b("toolbar", true)
     val oneHanded get() = s("one_handed", "off")

@@ -53,6 +53,8 @@ import com.matrixkey.theme.ThemeManager
 import java.io.File
 import java.util.concurrent.Executors
 
+private val PUNCTUATION = listOf(",", ".", "?", "!", "'", ":", ";")
+
 class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView.Listener,
     SharedPreferences.OnSharedPreferenceChangeListener {
 
@@ -262,6 +264,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         keyboard.feedback.soundEnabled = prefs.sound
         keyboard.feedback.volume = prefs.soundVolume
         keyboard.textScale = prefs.keyTextScale
+        keyboard.dottedIcons = prefs.dottedIcons
         topBar.onTapFeedback = { keyboard.feedback.key(topBar) }
 
         overlay.trailColor = when (prefs.trailColor) {
@@ -716,9 +719,22 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                 if (gen != suggestionGen) return@post
                 autoCorrection = auto
                 currentSuggestions = arrange(typed, list, auto)
+                // No predictions to show after a word (or predictions turned off):
+                // offer punctuation instead.
+                if (typed.isEmpty() && currentSuggestions.all { it.isEmpty() } && afterWord()) {
+                    currentSuggestions = PUNCTUATION
+                }
                 showToolbarOrSuggestions()
             }
         }
+    }
+
+    /** True when the cursor sits right after a word (or a word and one space). */
+    private fun afterWord(): Boolean {
+        val before = currentInputConnection?.getTextBeforeCursor(2, 0)?.toString().orEmpty()
+        if (before.isEmpty()) return false
+        val last = before.last()
+        return last.isLetterOrDigit() || (last == ' ' && before.length == 2 && before[0].isLetterOrDigit())
     }
 
     /** Middle slot = what space will insert; left = what you typed; right = next best (or an emoji). */
@@ -782,6 +798,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             }
             return
         }
+        if (s in PUNCTUATION) { insertPunctuation(s); return }
         val isEmoji = s.isNotEmpty() && !s[0].isLetterOrDigit() && s[0] != '“' && !s.any { it.isLetter() }
         val typedSlot = s.startsWith("“") && s.endsWith("”")
         if (typedSlot) s = s.substring(1, s.length - 1)
@@ -807,6 +824,21 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         }
         lastCorrection = null
         autoCorrection = null
+        updateShiftFromField()
+        refreshSuggestions()
+    }
+
+    /** "word |" + "," → "word, " (the space moves after the mark). */
+    private fun insertPunctuation(p: String) {
+        val ic = currentInputConnection ?: return
+        if (composing.isNotEmpty()) finishWord(autocorrect = true)
+        val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
+        if (before == " " && p != "'") ic.deleteSurroundingText(1, 0)
+        ic.commitText(if (p == "'" ) p else "$p ", 1)
+        phantomSpace = false
+        lastCorrection = null
+        lastGlide = null
+        if (p in listOf(".", "?", "!")) prevWord = null
         updateShiftFromField()
         refreshSuggestions()
     }

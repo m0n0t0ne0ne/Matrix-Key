@@ -42,6 +42,8 @@ class TopBarView(context: Context) : View(context) {
     /** Called on every successful tap, for haptic feedback. */
     var onTapFeedback: (() -> Unit)? = null
 
+    companion object { const val MAX_SLOTS = 7 }
+
     var listener: Listener? = null
     lateinit var theme: KeyboardTheme
     var typeface: Typeface = Typeface.DEFAULT
@@ -50,8 +52,9 @@ class TopBarView(context: Context) : View(context) {
     var mode = BarMode.SUGGESTIONS
         set(v) { field = v; invalidate() }
     /** Three slots: left, middle, right. Empty strings are blank slots. */
+    /** Usually three slots (left, middle, right); a punctuation row uses more. */
     var suggestions: List<String> = listOf("", "", "")
-        set(v) { field = (v + listOf("", "", "")).take(3); invalidate() }
+        set(v) { field = if (v.size > 3) v.take(MAX_SLOTS) else (v + listOf("", "", "")).take(3); invalidate() }
     /** Slot drawn emphasized (the word that space will insert). */
     var emphasized = -1
     var tools: List<Tool> = Tool.values().toList()
@@ -72,7 +75,8 @@ class TopBarView(context: Context) : View(context) {
 
     private val leftBtn = RectF()
     private val rightBtn = RectF()
-    private val slots = Array(3) { RectF() }
+    private val slots = Array(MAX_SLOTS) { RectF() }
+    private val slotCount get() = suggestions.size.coerceIn(3, MAX_SLOTS)
     private val toolRects = ArrayList<RectF>()
     private val searchBox = RectF()
     private var pressed: Any? = null
@@ -89,8 +93,11 @@ class TopBarView(context: Context) : View(context) {
         rightBtn.set(width - 6 * dp - btn, top, width - 6 * dp, top + btn)
         val l = leftBtn.right + 6 * dp
         val r = rightBtn.left - 6 * dp
-        val w = (r - l) / 3
-        for (i in 0..2) slots[i].set(l + i * w, top, l + (i + 1) * w, top + btn)
+        val n0 = slotCount
+        val w = (r - l) / n0
+        for (i in 0 until MAX_SLOTS) {
+            if (i < n0) slots[i].set(l + i * w, top, l + (i + 1) * w, top + btn) else slots[i].setEmpty()
+        }
         val n = tools.size
         while (toolRects.size < n) toolRects += RectF()
         while (toolRects.size > n) toolRects.removeAt(toolRects.size - 1)
@@ -122,7 +129,7 @@ class TopBarView(context: Context) : View(context) {
             fill.color = ColorUtils.setAlphaComponent(theme.text, 28)
             canvas.drawRoundRect(r, r.height() / 2, r.height() / 2, fill)
         }
-        Icons.draw(canvas, icon, r.centerX(), r.centerY(), r.height() * 0.5f, fg, false)
+        Icons.draw(canvas, icon, r.centerX(), r.centerY(), r.height() * 0.6f, fg, false)
     }
 
     private fun drawSuggestions(canvas: Canvas) {
@@ -130,7 +137,7 @@ class TopBarView(context: Context) : View(context) {
         roundButton(canvas, leftBtn, Icon.CHEVRON_RIGHT, t.chip, t.text)
         roundButton(canvas, rightBtn, Icon.CLIPBOARD, t.chip, t.text)
         text.typeface = typeface
-        for (i in 0..2) {
+        for (i in 0 until slotCount) {
             val s = suggestions[i]
             val r = slots[i]
             if (pressed === r && s.isNotEmpty()) {
@@ -155,7 +162,8 @@ class TopBarView(context: Context) : View(context) {
 
     private fun drawToolbar(canvas: Canvas) {
         val t = theme
-        roundButton(canvas, leftBtn, if (panelOpen) Icon.KEYBOARD else Icon.CHEVRON_LEFT, t.chip, t.text)
+        // Like Gboard: the tools grid sits on the left (tap it to go back to suggestions).
+        roundButton(canvas, leftBtn, if (panelOpen) Icon.KEYBOARD else Icon.GRID, if (panelOpen) t.chip else null, t.text)
         tools.forEachIndexed { i, tool ->
             val icon = when (tool) {
                 Tool.EMOJI -> Icon.EMOJI
@@ -230,7 +238,7 @@ class TopBarView(context: Context) : View(context) {
         when (mode) {
             BarMode.SUGGESTIONS -> {
                 if (rightBtn.contains(x, y)) return rightBtn
-                slots.forEach { if (it.contains(x, y)) return it }
+                for (i in 0 until slotCount) if (slots[i].contains(x, y)) return slots[i]
             }
             BarMode.TOOLBAR -> {
                 // Whole-cell hit areas, so taps between icons still count.

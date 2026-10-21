@@ -323,6 +323,7 @@ class ThemeActivity : AppCompatActivity() {
         preview.keyShape = keyShape
         preview.showHints = prefs.symbolHints
         preview.textScale = prefs.keyTextScale
+        preview.dottedIcons = prefs.dottedIcons
         preview.popupEnabled = prefs.popup
         preview.glideEnabled = true
         preview.trailEnabled = true
