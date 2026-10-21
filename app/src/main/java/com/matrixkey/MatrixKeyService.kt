@@ -104,6 +104,14 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     // Field flags
     private var noLearning = false
     private var noSuggestions = false
+    /** The strip is showing personal-dictionary matches for the text before the cursor. */
+    private var tokenSuggestions = false
+
+    /** Text before the cursor back to the last space (e.g. "kevin.mi" while typing an email). */
+    private fun currentToken(): String {
+        val before = currentInputConnection?.getTextBeforeCursor(80, 0)?.toString().orEmpty()
+        return before.takeLastWhile { !it.isWhitespace() }
+    }
     private var isPassword = false
 
     // Internal text field (GIF search, AI prompt, emoji search)
@@ -728,10 +736,18 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         val typed = composing.toString()
         val gen = ++suggestionGen
         if (!prefs.showSuggestions || noSuggestions) {
-            // No word suggestions here (the app asked for none, e.g. Google Keep notes,
-            // or they're turned off), but punctuation is still offered after a word.
+            // No word suggestions here (the app asked for none, e.g. email fields or
+            // Google Keep notes, or they're turned off). Still offer your own dictionary
+            // entries (like your email address) as you type, and punctuation after a word.
             autoCorrection = null
-            currentSuggestions = if (!isPassword && typed.isEmpty() && afterWord()) PUNCTUATION else emptyList()
+            val token = if (isPassword) "" else currentToken()
+            val mine = if (token.isNotEmpty()) engine.personalMatches(token) else emptyList()
+            tokenSuggestions = mine.isNotEmpty()
+            currentSuggestions = when {
+                mine.isNotEmpty() -> when (mine.size) { 1 -> listOf("", mine[0], ""); 2 -> listOf(mine[1], mine[0], ""); else -> listOf(mine[1], mine[0], mine[2]) }
+                !isPassword && typed.isEmpty() && afterWord() -> PUNCTUATION
+                else -> emptyList()
+            }
             showToolbarOrSuggestions()
             return
         }
@@ -750,6 +766,20 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                 if (gen != suggestionGen) return@post
                 autoCorrection = auto
                 currentSuggestions = arrange(typed, list, auto)
+                // Typing something like an email ("kevin.mi…"): offer matching
+                // personal-dictionary entries for the whole thing.
+                tokenSuggestions = false
+                val tok = currentToken()
+                if (tok.any { it == '@' || it == '.' || it == '_' || it == '-' }) {
+                    val mine = engine.personalMatches(tok)
+                    if (mine.isNotEmpty()) {
+                        currentSuggestions = listOf(mine.getOrElse(1) { "" }, mine[0], mine.getOrElse(2) { "" })
+                        tokenSuggestions = true
+                        autoCorrection = null
+                        showToolbarOrSuggestions()
+                        return@post
+                    }
+                }
                 // Right after "word" + space: punctuation is always on offer.
                 // With next-word prediction on, the two best predictions come first.
                 if (typed.isEmpty() && afterWord()) {
@@ -834,7 +864,17 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             }
             return
         }
-        if (s in PUNCTUATION) { insertPunctuation(s); return }
+        if (s in PUNCTUATION && !tokenSuggestions) { insertPunctuation(s); return }
+        if (tokenSuggestions) {
+            // Replace what you've typed of this entry with the whole entry.
+            ic.finishComposingText(); composing.clear()
+            val token = currentToken()
+            if (token.isNotEmpty()) ic.deleteSurroundingText(token.length, 0)
+            ic.commitText(s, 1)
+            tokenSuggestions = false
+            refreshSuggestions()
+            return
+        }
         val isEmoji = s.isNotEmpty() && !s[0].isLetterOrDigit() && s[0] != '“' && !s.any { it.isLetter() }
         val typedSlot = s.startsWith("“") && s.endsWith("”")
         if (typedSlot) s = s.substring(1, s.length - 1)

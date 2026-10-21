@@ -60,7 +60,7 @@ class DictionaryActivity : AppCompatActivity() {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             setSingleLine()
         }
-        val add = Button(this).apply {
+        val add = mkButton(this, true).apply {
             text = "Add"
             setOnClickListener {
                 val w = input.text.toString().trim()
@@ -74,10 +74,10 @@ class DictionaryActivity : AppCompatActivity() {
         col.addView(addRow)
 
         val tools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, px(8f), 0, 0) }
-        tools.addView(Button(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+        tools.addView(mkButton(this, false).apply {
             text = "Export"; setOnClickListener { export() }
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = px(8f) })
-        tools.addView(Button(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+        tools.addView(mkButton(this, false).apply {
             text = "Import"; setOnClickListener { import() }
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         col.addView(tools)
@@ -140,7 +140,7 @@ class DictionaryActivity : AppCompatActivity() {
             text = word; setTextColor(textColor); setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         if (meta != null) addView(TextView(context).apply { text = meta; setTextColor(subColor); textSize = 13f; setPadding(0, 0, px(8f), 0) })
-        addView(Button(context, null, com.google.android.material.R.attr.borderlessButtonStyle).apply {
+        addView(mkButton(context, false, borderless = true).apply {
             text = "Remove"
             setOnClickListener { io.execute { engine.removeWord(word); notifyService(); main.post { render() } } }
         })

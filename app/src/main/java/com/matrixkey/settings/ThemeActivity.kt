@@ -132,7 +132,7 @@ class ThemeActivity : AppCompatActivity() {
         }
         col.addView(card)
 
-        shapeButton = Button(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle)
+        shapeButton = mkButton(this, false)
         shapeButton.setTextColor(textColor)
         shapeButton.setOnClickListener { showShapeMenu() }
         card.addView(settingRow("Key shape", shapeButton))
@@ -152,11 +152,11 @@ class ThemeActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, px(24f), 0, 0)
         }
-        val cancel = Button(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+        val cancel = mkButton(this, false).apply {
             text = "Cancel"
             setOnClickListener { finish() }
         }
-        applyButton = Button(this).apply {
+        applyButton = mkButton(this, true).apply {
             text = "Apply"
             setOnClickListener { apply() }
         }

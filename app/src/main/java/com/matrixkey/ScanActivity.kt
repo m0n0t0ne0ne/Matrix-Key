@@ -21,6 +21,7 @@ import androidx.preference.PreferenceManager
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.matrixkey.settings.mkButton
 import com.matrixkey.settings.pageHeader
 import java.io.File
 
@@ -55,9 +56,9 @@ class ScanActivity : AppCompatActivity() {
         col.addView(header)
 
         val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        buttons.addView(Button(this).apply { text = "Take photo"; setOnClickListener { takePhoto() } },
+        buttons.addView(mkButton(this, true).apply { text = "Take photo"; setOnClickListener { takePhoto() } },
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = px(8f) })
-        buttons.addView(Button(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+        buttons.addView(mkButton(this, false).apply {
             text = "Choose image"; setOnClickListener { pickImage() }
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         col.addView(buttons)
@@ -84,7 +85,7 @@ class ScanActivity : AppCompatActivity() {
         }
         col.addView(result, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
-        insert = Button(this).apply {
+        insert = mkButton(this, true).apply {
             text = "Insert text"
             isEnabled = false
             setOnClickListener { done() }
@@ -94,7 +95,6 @@ class ScanActivity : AppCompatActivity() {
         })
 
         setContentView(ScrollView(this).apply { addView(col) })
-        if (savedInstanceState == null) takePhoto()
     }
 
     private fun takePhoto() {

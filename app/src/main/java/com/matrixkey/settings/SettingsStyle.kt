@@ -98,6 +98,35 @@ fun pageHeader(activity: Activity, title: String, showBack: Boolean, onBack: () 
     return col to titleView
 }
 
+/**
+ * A pill button in the settings palette: filled = white on black (dark mode)
+ * or black on white (light mode); outlined = thin grey outline. No wallpaper colors.
+ */
+fun mkButton(ctx: Context, filled: Boolean, borderless: Boolean = false): android.widget.Button =
+    android.widget.Button(ctx, null, 0, 0).apply {
+        val text = ContextCompat.getColor(ctx, R.color.mk_text)
+        val bg = ContextCompat.getColor(ctx, R.color.mk_bg)
+        isAllCaps = false
+        stateListAnimator = null
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+        minHeight = ctx.dpi(48f); minimumHeight = ctx.dpi(48f)
+        setPadding(ctx.dpi(20f), ctx.dpi(10f), ctx.dpi(20f), ctx.dpi(10f))
+        setTextColor(android.content.res.ColorStateList(
+            arrayOf(intArrayOf(-android.R.attr.state_enabled), intArrayOf()),
+            intArrayOf(ContextCompat.getColor(ctx, R.color.mk_sub), if (filled) bg else text)
+        ))
+        val shape = GradientDrawable().apply {
+            cornerRadius = ctx.dpf(26f)
+            when {
+                filled -> setColor(text)
+                borderless -> setColor(android.graphics.Color.TRANSPARENT)
+                else -> { setColor(android.graphics.Color.TRANSPARENT); setStroke(ctx.dpi(1.5f), ContextCompat.getColor(ctx, R.color.mk_sub)) }
+            }
+        }
+        val ripple = android.content.res.ColorStateList.valueOf(androidx.core.graphics.ColorUtils.setAlphaComponent(if (filled) bg else text, 50))
+        background = android.graphics.drawable.RippleDrawable(ripple, shape, null)
+    }
+
 /** Rounded "Search settings" pill. */
 fun searchPill(ctx: Context, onClick: () -> Unit): View {
     val row = LinearLayout(ctx).apply {
