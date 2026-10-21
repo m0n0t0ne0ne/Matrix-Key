@@ -88,7 +88,7 @@ class PrefsFragment : PreferenceFragmentCompat() {
         findPreference<Preference>("voice_mic")?.summary = if (mic) "Allowed" else "Tap to allow"
         findPreference<Preference>("setup")?.isVisible = !(enabled && selected && mic)
         findPreference<Preference>("about")?.summary =
-            "Matrix Key " + (runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "") + " · Key font: " + (if (FontManager.hasSystemNdot()) "Nothing NDot (system)" else "Doto (SIL OFL)") +
+            "Matrix Key " + (runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "") + " · Nothing fonts found: " + (FontManager.nothingFonts().joinToString { it.label }.ifEmpty { "Doto (SIL OFL), no Nothing fonts found" }) +
                 " · Word list: FrequencyWords (CC BY-SA 4.0)"
     }
 

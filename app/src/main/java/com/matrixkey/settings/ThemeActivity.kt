@@ -125,7 +125,11 @@ class ThemeActivity : AppCompatActivity() {
 
         // Key font
         fontRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        col.addView(settingRow("Key font", fontRow))
+        col.addView(TextView(this).apply {
+            text = "Key font"; setTextColor(textColor); setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            setPadding(0, px(14f), 0, px(8f))
+        })
+        col.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(fontRow) })
 
         // Accent
         accentRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
@@ -240,16 +244,29 @@ class ThemeActivity : AppCompatActivity() {
 
     private fun buildFontRow() {
         fontRow.removeAllViews()
+        val opts = ArrayList<Pair<String, String>>()
+        val nothing = FontManager.nothingFonts()
+        // Every Nothing font found on the phone, each shown in its own typeface.
+        nothing.forEach { opts += it.prefValue to it.label }
+        if (nothing.isEmpty()) opts += "ndot" to "NDot (not found)"
+        opts += "doto" to "Doto"
+        opts += "system" to "System"
         val hasCustom = FontManager.customFontFile(this).exists()
-        val opts = mutableListOf("ndot" to "NDot", "system" to "System")
         opts += "custom" to if (hasCustom) "Custom" else "Import…"
-        opts.forEach { (id, label) ->
-            val c = chip(label, keyFont == id) {
+        // "ndot" (auto) counts as the best NDot match.
+        val autoMatch = if (keyFont == "ndot") nothing.filter { it.isDot }
+            .sortedWith(compareBy({ !it.file.name.contains("57") }, { it.file.name.length })).firstOrNull()?.prefValue else null
+        opts.forEachIndexed { i, (id, label) ->
+            val selected = keyFont == id || autoMatch == id
+            val c = chip(label, selected) {
                 if (id == "custom" && !FontManager.customFontFile(this).exists()) pickFont()
                 else { keyFont = id; refreshAll() }
             }
+            if (id != "custom") c.typeface = FontManager.keyTypeface(this, id)
             if (id == "custom" && hasCustom) c.setOnLongClickListener { pickFont(); true }
-            fontRow.addView(c, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(40f)).apply { marginStart = px(6f) })
+            fontRow.addView(c, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(44f)).apply {
+                if (i > 0) marginStart = px(8f)
+            })
         }
     }
 

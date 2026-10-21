@@ -331,6 +331,7 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
             MotionEvent.ACTION_MOVE -> {
                 val i = e.findPointerIndex(pointerId)
                 if (i >= 0) {
+                    lastX = e.getX(i); lastY = e.getY(i)
                     if (state == State.GLIDE) {
                         for (h in 0 until e.historySize) move(e.getHistoricalX(i, h), e.getHistoricalY(i, h))
                     }
@@ -358,7 +359,7 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
         val k = findKey(x, y) ?: return
         pressedKey = k
         state = State.PRESS
-        downX = x; downY = y; anchorX = x
+        downX = x; downY = y; anchorX = x; lastX = x; lastY = y
         cursorSteps = 0; deleteWords = 0
         feedback.key(this, k.type)
         if (popupEnabled && k.type == KeyType.CHAR && k.label.isNotEmpty()) {
@@ -375,9 +376,12 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
     }
 
     private fun move(x: Float, y: Float) {
-        val k = pressedKey ?: return
         when (state) {
             State.PRESS -> {
+                val k = pressedKey ?: return
+                // Moving the finger cancels a pending long-press (so a glide that
+                // starts slowly isn't hijacked by the symbol popup).
+                if (hypot(x - downX, y - downY) > 10 * dp && k.type != KeyType.BACKSPACE) handler.removeCallbacks(longPress)
                 val dx = x - downX; val dy = y - downY
                 val dist = hypot(dx, dy)
                 if (k.type == KeyType.SPACE && gestureCursor && abs(dx) > keyWidth * 0.45f) {
@@ -445,9 +449,13 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
         }
     }
 
+    private var lastX = 0f
+    private var lastY = 0f
+
     private fun onLongPress() {
         val k = pressedKey ?: return
         if (state != State.PRESS) return
+        if (k.type != KeyType.BACKSPACE && hypot(lastX - downX, lastY - downY) > 10 * dp) return
         when {
             k.type == KeyType.BACKSPACE -> {
                 state = State.REPEAT

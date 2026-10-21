@@ -2,25 +2,37 @@ package com.matrixkey.theme
 
 import android.content.Context
 import android.graphics.Typeface
+import android.graphics.fonts.SystemFonts
 import java.io.File
 
 /**
- * Picks the key font.
- *  - "ndot": Nothing's NDot system font when present, else the bundled Doto
- *    dot-matrix font, else bold monospace.
- *  - "system": the phone's own system font.
- *  - "custom": a font file the person imported in the Theme screen.
+ * Picks the key font. Preference values:
+ *  - "ndot":   Nothing's dot font from the phone (NDot 57 preferred), else Doto
+ *  - "sys:<path>": one specific Nothing font file found on the phone
+ *  - "doto":   the bundled open-source Doto dot-matrix font
+ *  - "system": the phone's regular system font
+ *  - "custom": a font file imported in the Theme screen
  */
 object FontManager {
-    private var cachedNdot: Typeface? = null
-    private var cachedCustom: Pair<Long, Typeface>? = null
+    private val cache = HashMap<String, Typeface>()
+
+    data class NothingFont(val file: File, val label: String) {
+        val prefValue get() = "sys:" + file.absolutePath
+        val isDot get() = file.name.lowercase().contains("dot")
+    }
 
     /** True when the key font is a dot-matrix one (drives the dotted icons and trail). */
-    fun isDotFont(fontPref: String) = fontPref == "ndot"
+    fun isDotFont(fontPref: String) = when {
+        fontPref == "ndot" || fontPref == "doto" -> true
+        fontPref.startsWith("sys:") -> fontPref.lowercase().contains("dot")
+        else -> false
+    }
 
-    fun keyTypeface(context: Context, fontPref: String): Typeface = when (fontPref) {
-        "system" -> Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        "custom" -> custom(context) ?: ndot(context)
+    fun keyTypeface(context: Context, fontPref: String): Typeface = when {
+        fontPref == "system" -> Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        fontPref == "custom" -> custom(context) ?: ndot(context)
+        fontPref == "doto" -> doto(context)
+        fontPref.startsWith("sys:") -> fromFile(File(fontPref.removePrefix("sys:"))) ?: ndot(context)
         else -> ndot(context)
     }
 
@@ -29,45 +41,64 @@ object FontManager {
     private fun custom(context: Context): Typeface? {
         val f = customFontFile(context)
         if (!f.exists()) return null
-        cachedCustom?.let { if (it.first == f.lastModified()) return it.second }
-        return runCatching { Typeface.createFromFile(f) }.getOrNull()?.also {
-            cachedCustom = f.lastModified() to it
-        }
+        val key = "custom:" + f.lastModified()
+        cache[key]?.let { return it }
+        return runCatching { Typeface.createFromFile(f) }.getOrNull()?.also { cache[key] = it }
+    }
+
+    private fun fromFile(f: File): Typeface? {
+        val key = "file:" + f.absolutePath
+        cache[key]?.let { return it }
+        if (!f.exists()) return null
+        return runCatching { Typeface.createFromFile(f) }.getOrNull()?.also { cache[key] = it }
     }
 
     fun ndot(context: Context): Typeface {
-        cachedNdot?.let { return it }
-        val tf = findSystemNdot() ?: bundledDoto(context) ?: Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-        cachedNdot = tf
+        val best = nothingFonts().filter { it.isDot }
+            .sortedWith(compareBy({ !it.file.name.contains("57") }, { it.file.name.length }))
+            .firstOrNull()
+        return best?.let { fromFile(it.file) } ?: doto(context)
+    }
+
+    fun doto(context: Context): Typeface {
+        cache["doto"]?.let { return it }
+        val tf = runCatching {
+            Typeface.Builder(context.assets, "fonts/Doto.ttf").setFontVariationSettings("'wght' 800").build()
+        }.getOrNull() ?: Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        cache["doto"] = tf
         return tf
     }
 
-    /** Whether Nothing's own NDot font was found on this phone. */
-    fun hasSystemNdot(): Boolean = findSystemNdotFile() != null
+    private var scanned: List<NothingFont>? = null
 
-    private fun findSystemNdotFile(): File? {
-        val dirs = listOf("/system/fonts", "/product/fonts", "/system_ext/fonts")
-        val candidates = dirs.flatMap { d ->
-            File(d).listFiles()?.filter { f ->
-                val n = f.name.lowercase()
-                n.contains("ndot") && (n.endsWith(".ttf") || n.endsWith(".otf"))
-            } ?: emptyList()
+    /** Every Nothing typeface installed on the phone (NDot, NType, Lettera …). */
+    fun nothingFonts(): List<NothingFont> {
+        scanned?.let { return it }
+        val files = LinkedHashSet<File>()
+        runCatching { SystemFonts.getAvailableFonts().mapNotNull { it.file }.forEach { files += it } }
+        listOf("/system/fonts", "/product/fonts", "/system_ext/fonts", "/my_product/fonts", "/vendor/fonts").forEach { d ->
+            File(d).listFiles()?.let { files.addAll(it) }
         }
-        // Prefer the classic NDot 55 cut when several are present.
-        return candidates.sortedWith(compareBy({ !it.name.contains("55") }, { it.name.length })).firstOrNull()
+        val out = files.filter { f ->
+            val n = f.name.lowercase()
+            (n.endsWith(".ttf") || n.endsWith(".otf")) &&
+                (n.contains("ndot") || n.contains("ntype") || n.contains("nothing") || n.contains("lettera"))
+        }.distinctBy { it.name.lowercase() }
+            .map { NothingFont(it, prettyName(it.name)) }
+            .sortedWith(compareBy({ !it.isDot }, { it.label }))
+        scanned = out
+        return out
     }
 
-    private fun findSystemNdot(): Typeface? =
-        findSystemNdotFile()?.let { runCatching { Typeface.createFromFile(it) }.getOrNull() }
+    fun hasSystemNdot(): Boolean = nothingFonts().any { it.isDot }
 
-    private fun bundledDoto(context: Context): Typeface? = runCatching {
-        Typeface.Builder(context.assets, "fonts/Doto.ttf")
-            .setFontVariationSettings("'wght' 800")
-            .build()
-    }.getOrNull()
+    private fun prettyName(file: String): String {
+        val base = file.substringBeforeLast('.').replace('_', ' ').replace('-', ' ')
+        return base.replace(Regex("(?i)ndot"), "NDot ").replace(Regex("(?i)ntype"), "NType ")
+            .replace(Regex("\\s+"), " ").trim()
+    }
 
     fun clearCache() {
-        cachedNdot = null
-        cachedCustom = null
+        cache.clear()
     }
 }

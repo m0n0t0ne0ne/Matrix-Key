@@ -79,13 +79,14 @@ class TopBarView(context: Context) : View(context) {
         val r = rightBtn.left - 6 * dp
         val w = (r - l) / 3
         for (i in 0..2) slots[i].set(l + i * w, top, l + (i + 1) * w, top + btn)
-        toolRects.clear()
         val n = tools.size
+        while (toolRects.size < n) toolRects += RectF()
+        while (toolRects.size > n) toolRects.removeAt(toolRects.size - 1)
         val area = width - leftBtn.right - 8 * dp
-        val cell = area / n
+        val cell = area / n.coerceAtLeast(1)
         for (i in 0 until n) {
             val cx = leftBtn.right + 4 * dp + cell * i + cell / 2
-            toolRects += RectF(cx - btn / 2, top, cx + btn / 2, top + btn)
+            toolRects[i].set(cx - btn / 2, top, cx + btn / 2, top + btn)
         }
         searchBox.set(leftBtn.right + 6 * dp, top, rightBtn.left - 6 * dp, top + btn)
     }
@@ -211,7 +212,15 @@ class TopBarView(context: Context) : View(context) {
                 if (rightBtn.contains(x, y)) return rightBtn
                 slots.forEach { if (it.contains(x, y)) return it }
             }
-            BarMode.TOOLBAR -> toolRects.forEach { if (RectF(it).apply { inset(-8 * dp, -4 * dp) }.contains(x, y)) return it }
+            BarMode.TOOLBAR -> {
+                // Whole-cell hit areas, so taps between icons still count.
+                val n = toolRects.size
+                if (n > 0 && x > leftBtn.right) {
+                    val cell = (width - leftBtn.right - 8 * dp) / n
+                    val i = ((x - leftBtn.right - 4 * dp) / cell).toInt().coerceIn(0, n - 1)
+                    return toolRects[i]
+                }
+            }
             BarMode.SEARCH -> if (rightBtn.contains(x, y)) return rightBtn
             BarMode.MESSAGE -> {}
         }
