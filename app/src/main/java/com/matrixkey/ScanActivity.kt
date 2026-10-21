@@ -97,6 +97,12 @@ class ScanActivity : AppCompatActivity() {
         setContentView(ScrollView(this).apply { addView(col) })
     }
 
+    override fun onDestroy() {
+        // Don't keep the photo around once you're done with Scan text.
+        if (isFinishing) File(cacheDir, "ocr").listFiles()?.forEach { it.delete() }
+        super.onDestroy()
+    }
+
     private fun takePhoto() {
         val dir = File(cacheDir, "ocr").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }

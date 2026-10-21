@@ -17,6 +17,8 @@ object Http {
     fun bytes(url: String, maxBytes: Int = 8 * 1024 * 1024): ByteArray = request("GET", url, emptyMap(), null, maxBytes)
 
     private fun request(method: String, url: String, headers: Map<String, String>, body: ByteArray?, maxBytes: Int = 4 * 1024 * 1024): ByteArray {
+        // Every service the keyboard talks to is HTTPS; refuse anything else.
+        if (!url.startsWith("https://")) throw HttpError(0, "Refused a non-HTTPS address")
         val c = URL(url).openConnection() as HttpURLConnection
         try {
             c.requestMethod = method

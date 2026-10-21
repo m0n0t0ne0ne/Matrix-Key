@@ -157,9 +157,10 @@ class PrefsFragment : PreferenceFragmentCompat() {
         val mic = ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         findPreference<Preference>("setup_enable")?.summary = if (enabled) "Done ✓" else "Enable it in your phone's keyboard list"
         findPreference<Preference>("setup_select")?.summary = if (selected) "Done ✓" else "Pick it as your current keyboard"
-        findPreference<Preference>("setup_mic")?.summary = if (mic) "Done ✓" else "Needed for voice typing"
+        findPreference<Preference>("setup_mic")?.summary = if (mic) "Done ✓" else "Optional · only for voice typing"
         findPreference<Preference>("voice_mic")?.summary = if (mic) "Allowed" else "Tap to allow"
-        findPreference<Preference>("setup")?.isVisible = !(enabled && selected && mic)
+        // The microphone is optional, so setup is complete without it.
+        findPreference<Preference>("setup")?.isVisible = !(enabled && selected)
         findPreference<Preference>("about")?.summary =
             "Version " + (runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "")
     }

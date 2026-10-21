@@ -424,7 +424,17 @@ class ThemeActivity : AppCompatActivity() {
             FONT_REQ -> try {
                 val dest = FontManager.customFontFile(this)
                 dest.parentFile?.mkdirs()
-                contentResolver.openInputStream(uri)?.use { input -> dest.outputStream().use { input.copyTo(it) } }
+                contentResolver.openInputStream(uri)?.use { input ->
+                    dest.outputStream().use { out ->
+                        val buf = ByteArray(16 * 1024); var total = 0L
+                        while (true) {
+                            val n = input.read(buf); if (n < 0) break
+                            total += n
+                            if (total > 30L * 1024 * 1024) { out.close(); dest.delete(); throw Exception("That font file is too large") }
+                            out.write(buf, 0, n)
+                        }
+                    }
+                }
                 val ok = runCatching { android.graphics.Typeface.createFromFile(dest) }.isSuccess
                 if (!ok) { dest.delete(); throw Exception("That file isn't a font") }
                 FontManager.clearCache()

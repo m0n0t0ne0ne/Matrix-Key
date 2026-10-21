@@ -29,15 +29,31 @@ object RboardImporter {
 
         val input = context.contentResolver.openInputStream(uri) ?: throw ImportException("Couldn't open the file")
         ZipInputStream(input.buffered()).use { zip ->
+            var entries = 0
+            var total = 0L
+            // Reads at most [limit] bytes of the current entry; refuses oversized themes.
+            fun read(limit: Int): ByteArray {
+                val out = java.io.ByteArrayOutputStream()
+                val buf = ByteArray(16 * 1024)
+                while (true) {
+                    val n = zip.read(buf)
+                    if (n < 0) break
+                    out.write(buf, 0, n)
+                    total += n
+                    if (out.size() > limit || total > 40L * 1024 * 1024) throw ImportException("This theme file is too large")
+                }
+                return out.toByteArray()
+            }
             while (true) {
                 val entry = zip.nextEntry ?: break
+                if (++entries > 2000) throw ImportException("This theme file has too many parts")
                 if (entry.isDirectory) continue
                 val name = entry.name.lowercase()
                 when {
-                    name.endsWith(".css") -> css.append(zip.readBytes().toString(Charsets.UTF_8)).append('\n')
-                    name.endsWith("metadata.json") -> meta = runCatching { JSONObject(zip.readBytes().toString(Charsets.UTF_8)) }.getOrNull()
+                    name.endsWith(".css") -> css.append(read(2 * 1024 * 1024).toString(Charsets.UTF_8)).append('\n')
+                    name.endsWith("metadata.json") -> meta = runCatching { JSONObject(read(256 * 1024).toString(Charsets.UTF_8)) }.getOrNull()
                     name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".webp") -> {
-                        val bytes = zip.readBytes()
+                        val bytes = read(12 * 1024 * 1024)
                         val score = imageScore(name, bytes)
                         if (score > bgImageScore) {
                             bgImageScore = score

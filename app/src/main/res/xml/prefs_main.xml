@@ -15,7 +15,7 @@
             android:icon="@drawable/ic_mk_check" />
         <Preference
             android:key="setup_mic"
-            android:title="Allow the microphone"
+            android:title="Allow the microphone (optional)"
             android:summary="Needed for voice typing"
             android:icon="@drawable/ic_mk_mic" />
     </com.matrixkey.settings.DotCategory>

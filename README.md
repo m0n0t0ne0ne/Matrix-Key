@@ -120,9 +120,11 @@ Tap the **Scan text** button, then **Take photo** or **Choose image**. The text 
 
 ## Privacy
 
-- Typing, learning, the dictionary and clipboard history stay on the device.
-- The internet permission is used only for GIF search and AI writing.
-- The keyboard doesn't learn in fields that ask for no personalization, such as incognito tabs.
+- Typing, learning, your dictionary and clipboard history stay on the phone. They're excluded from backups and from transfer to a new phone.
+- Permissions: internet (GIFs and AI writing only), vibration, and the microphone, which is optional and only for voice typing.
+- Every network request is HTTPS and goes straight to the provider you chose, using your own key.
+- The keyboard doesn't learn in password fields or fields that ask for no personalization, such as incognito tabs.
+- See [SECURITY.md](SECURITY.md) for the full details.
 
 ## Building it yourself
 
