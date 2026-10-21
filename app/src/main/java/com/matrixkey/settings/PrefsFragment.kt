@@ -13,6 +13,7 @@ import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
+import com.matrixkey.engine.WordEngine
 import com.matrixkey.theme.FontManager
 import java.io.File
 
@@ -156,16 +157,8 @@ class PrefsFragment : PreferenceFragmentCompat() {
 }
 
 fun resetLearned(context: Context, keepPersonal: Boolean) {
-    val f = File(context.filesDir, "learned.json")
-    if (keepPersonal && f.exists()) {
-        runCatching {
-            val o = org.json.JSONObject(f.readText())
-            val keep = org.json.JSONObject()
-            o.optJSONArray("personal")?.let { keep.put("personal", it) }
-            o.optJSONObject("casing")?.let { keep.put("casing", it) }
-            f.writeText(keep.toString())
-        }.onFailure { f.delete() }
-    } else f.delete()
+    val engine = WordEngine.get(context)
+    WordEngine.handler.post { engine.ensureLoaded(); engine.resetLearned(keepPersonal) }
     PreferenceManager.getDefaultSharedPreferences(context).edit()
         .remove("aim")
         .putLong("reset_learned_at", System.currentTimeMillis())
@@ -173,7 +166,8 @@ fun resetLearned(context: Context, keepPersonal: Boolean) {
 }
 
 fun deleteAll(context: Context) {
-    File(context.filesDir, "learned.json").delete()
+    val engine = WordEngine.get(context)
+    WordEngine.handler.post { engine.ensureLoaded(); engine.resetLearned(keepPersonal = false); File(context.filesDir, "learned.json").delete() }
     File(context.filesDir, "clipboard.json").delete()
     File(context.filesDir, "themes").deleteRecursively()
     File(context.filesDir, "fonts").deleteRecursively()

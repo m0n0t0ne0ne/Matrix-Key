@@ -2,6 +2,8 @@ package com.matrixkey.engine
 
 import android.content.Context
 import android.graphics.PointF
+import android.os.Handler
+import android.os.HandlerThread
 import org.json.JSONObject
 import java.io.File
 import kotlin.math.abs
@@ -13,8 +15,13 @@ import kotlin.math.sqrt
 /**
  * Suggestions, autocorrect, next-word prediction, glide-typing decoding and
  * on-device learning. Everything here stays on the phone.
+ *
+ * There is one shared engine per app process ([get]), used by both the keyboard
+ * and the Dictionary screen, and it is only touched on its own thread
+ * ([handler]). That way a word added in settings is instantly part of the same
+ * data the keyboard types and swipes with, and nothing can overwrite it.
  */
-class WordEngine(private val context: Context) {
+class WordEngine private constructor(private val context: Context) {
 
     /** Lower-case word → base frequency score (log scale, higher is more common). */
     private val base = HashMap<String, Float>(60000)
@@ -44,7 +51,10 @@ class WordEngine(private val context: Context) {
     var keyCenters: Map<Char, PointF> = emptyMap()
     var keyWidth = 1f
 
-    fun load() {
+    /** Loads the word list and your learned data the first time it's needed. */
+    fun ensureLoaded() { if (!ready) load() }
+
+    private fun load() {
         runCatching {
             context.assets.open("dict/en_50k.txt").bufferedReader().useLines { lines ->
                 var rank = 0
@@ -91,7 +101,10 @@ class WordEngine(private val context: Context) {
             if (letters.isNotEmpty()) byEnds.getOrPut("${letters.first()}${letters.last()}") { ArrayList() }.add(w)
         }
         sorted = all.toTypedArray().also { it.sort() }
+        personalSnapshot = personal.toList()
     }
+
+    @Volatile private var personalSnapshot: List<String> = emptyList()
 
     // ------------------------------------------------------------------
     // Scoring
@@ -374,17 +387,20 @@ class WordEngine(private val context: Context) {
 
                 val score = -dtw * 6f - miss * 5f - extra * 4f - se * 2f - lenPen * 1.5f +
                     freq(w) * 0.6f + bigramBoost(prev, w) * 0.8f + (if (habitsGlide[w] != null) 3f else 0f) +
-                    ambiguityBias(w, prev)
+                    ambiguityBias(w, prev) + (if (w in personal) PERSONAL_GLIDE_BONUS else 0f)
                 scored += w to score
             }
         }
-        return scored.asSequence()
-            .filter { !hidden(it.first, blockOffensive) }
-            .sortedByDescending { it.second }
-            .map { display(it.first) }
-            .distinct()
-            .take(5)
-            .toList()
+        val ranked = scored.filter { !hidden(it.first, blockOffensive) }.sortedByDescending { it.second }
+        val out = ranked.asSequence().map { display(it.first) }.distinct().take(5).toMutableList()
+        // A dictionary word that was a close call always makes the bar, so it's one tap away.
+        val top = ranked.firstOrNull()?.second
+        val mine = ranked.firstOrNull { it.first in personal }
+        if (top != null && mine != null && top - mine.second < 6f) {
+            val d = display(mine.first)
+            if (out.indexOf(d) !in 0..2) { out.remove(d); out.add(minOf(1, out.size), d) }
+        }
+        return out
     }
 
     /** Swipes for "ill"/"I'll" trace the same keys: let the previous word decide. */
@@ -521,7 +537,8 @@ class WordEngine(private val context: Context) {
     fun personalMatches(prefix: String): List<String> {
         val p = prefix.lowercase()
         if (p.isEmpty()) return emptyList()
-        return personal.filter { it.startsWith(p) && it != p }.sortedBy { it.length }.map { display(it) }.take(6)
+        // Called from the keyboard's main thread too, so read an immutable copy.
+        return personalSnapshot.filter { it.startsWith(p) && it != p }.sortedBy { it.length }.map { display(it) }.take(6)
     }
     fun learnedWords(): List<Pair<String, Int>> =
         userCounts.filter { !base.containsKey(it.key) && it.key !in personal && it.value >= LEARN_AFTER }
@@ -572,7 +589,7 @@ class WordEngine(private val context: Context) {
     }
 
     private fun fromJson(o: JSONObject, merge: Boolean) {
-        if (!merge) { userCounts.clear(); personal.clear(); habits.clear(); bigrams.clear(); blocked.clear(); casing.clear() }
+        if (!merge) { userCounts.clear(); personal.clear(); habits.clear(); habitsGlide.clear(); bigrams.clear(); blocked.clear(); casing.clear() }
         o.optJSONObject("user")?.let { u -> u.keys().forEach { k -> userCounts[k] = (userCounts[k] ?: 0) + u.optInt(k) } }
         o.optJSONArray("personal")?.let { a -> for (i in 0 until a.length()) personal += a.getString(i) }
         o.optJSONObject("habits")?.let { h -> h.keys().forEach { k -> habits[k] = h.getString(k) } }
@@ -593,6 +610,16 @@ class WordEngine(private val context: Context) {
         if (f.exists()) runCatching { fromJson(JSONObject(f.readText()), merge = false) }
     }
 
+    /** Forgets what was learned from typing; optionally keeps your personal dictionary. */
+    fun resetLearned(keepPersonal: Boolean) {
+        val keep = if (keepPersonal) personal.toList() else emptyList()
+        val keepCasing = casing.filterKeys { it in keep }
+        fromJson(JSONObject(), merge = false)
+        personal += keep
+        casing += keepCasing
+        rebuildIndexes(); dirty = true; save()
+    }
+
     fun save() {
         if (!dirty) return
         runCatching {
@@ -604,6 +631,18 @@ class WordEngine(private val context: Context) {
     }
 
     companion object {
+        @Volatile private var shared: WordEngine? = null
+
+        fun get(context: Context): WordEngine =
+            shared ?: synchronized(this) { shared ?: WordEngine(context.applicationContext).also { shared = it } }
+
+        private val thread by lazy { HandlerThread("words").apply { start() } }
+        /** The only thread that reads or changes engine data. */
+        val handler by lazy { Handler(thread.looper) }
+
+        /** Extra glide score for personal-dictionary words (tested: no loss on common words). */
+        private const val PERSONAL_GLIDE_BONUS = 2.5f
+
         /** A new word becomes a suggestion after you've typed it this many times. */
         const val LEARN_AFTER = 2
 

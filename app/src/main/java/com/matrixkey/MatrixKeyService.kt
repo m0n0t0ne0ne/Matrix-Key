@@ -10,7 +10,6 @@ import android.graphics.PointF
 import android.inputmethodservice.InputMethodService
 import android.net.Uri
 import android.os.Handler
-import android.os.HandlerThread
 import android.os.Looper
 import android.text.InputType
 import android.view.KeyEvent
@@ -61,8 +60,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     private lateinit var engine: WordEngine
     private lateinit var clipStore: ClipboardStore
     private val main = Handler(Looper.getMainLooper())
-    private val engineThread = HandlerThread("words").apply { start() }
-    private val engineHandler by lazy { Handler(engineThread.looper) }
+    private val engineHandler get() = WordEngine.handler
     private val net = Executors.newFixedThreadPool(4)
 
     // Views
@@ -136,8 +134,8 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         super.onCreate()
         prefs = Prefs(this)
         prefs.sp.registerOnSharedPreferenceChangeListener(this)
-        engine = WordEngine(this)
-        engineHandler.post { engine.load() }
+        engine = WordEngine.get(this)
+        engineHandler.post { engine.ensureLoaded() }
         clipStore = ClipboardStore(this)
         (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).addPrimaryClipChangedListener(clipListener)
         voice = VoiceInput(this, prefs,
@@ -151,7 +149,6 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         runCatching { (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).removePrimaryClipChangedListener(clipListener) }
         voice.stop()
         engineHandler.post { engine.save() }
-        engineThread.quitSafely()
         net.shutdownNow()
         super.onDestroy()
     }
@@ -159,11 +156,9 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     override fun onSharedPreferenceChanged(sp: SharedPreferences?, key: String?) {
         needsReload = true
         if (key == "reset_learned_at") {
-            engineHandler.post { engine.load() }
             if (::keyboard.isInitialized) keyboard.clearAim()
             prefs.sp.edit().remove("aim").apply()
         }
-        if (key == "dict_changed_at") engineHandler.post { engine.load() }
     }
 
     override fun onCreateInputView(): View {

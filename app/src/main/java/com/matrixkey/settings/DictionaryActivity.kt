@@ -19,17 +19,16 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
-import androidx.preference.PreferenceManager
 import com.google.android.material.color.MaterialColors
 import com.matrixkey.engine.WordEngine
-import java.util.concurrent.Executors
 
 /** Personal dictionary and learned words: view, add, remove, import, export. */
 class DictionaryActivity : AppCompatActivity() {
 
     private lateinit var engine: WordEngine
     private lateinit var list: LinearLayout
-    private val io = Executors.newSingleThreadExecutor()
+    /** Engine work runs on the engine's own thread. */
+    private val io get() = WordEngine.handler
     private val main = Handler(Looper.getMainLooper())
     private val dp get() = resources.displayMetrics.density
     private fun px(v: Float) = (v * dp).toInt()
@@ -41,7 +40,7 @@ class DictionaryActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         title = dotTitle(this, "Dictionary")
-        engine = WordEngine(this)
+        engine = WordEngine.get(this)
 
         val scroll = ScrollView(this)
         val col = LinearLayout(this).apply {
@@ -64,7 +63,7 @@ class DictionaryActivity : AppCompatActivity() {
             setOnClickListener {
                 val w = input.text.toString().trim()
                 if (w.isNotEmpty() && !w.contains(' ')) {
-                    io.execute { engine.addPersonal(w); notifyService(); main.post { input.setText(""); render() } }
+                    io.post { engine.addPersonal(w); main.post { input.setText(""); render() } }
                 }
             }
         }
@@ -95,19 +94,10 @@ class DictionaryActivity : AppCompatActivity() {
         }
 
         list.addView(TextView(this).apply { text = "Loading…"; setTextColor(subColor); setPadding(px(4f), px(16f), 0, 0) })
-        io.execute { engine.load(); main.post { render() } }
+        io.post { engine.ensureLoaded(); render() }
     }
 
     override fun onSupportNavigateUp(): Boolean { finish(); return true }
-
-    override fun onDestroy() {
-        io.shutdown()
-        super.onDestroy()
-    }
-
-    private fun notifyService() {
-        PreferenceManager.getDefaultSharedPreferences(this).edit().putLong("dict_changed_at", System.currentTimeMillis()).apply()
-    }
 
     private fun section(title: String) = TextView(this).apply {
         text = title
@@ -116,17 +106,24 @@ class DictionaryActivity : AppCompatActivity() {
         setPadding(px(4f), px(22f), 0, px(6f))
     }
 
+    /** Reads the word lists on the engine's thread, then shows them. */
     private fun render() {
+        io.post {
+            val personal = engine.personalWords().map { engine.display(it) }.sortedBy { it.lowercase() }
+            val learned = engine.learnedWords().take(300)
+            main.post { show(personal, learned) }
+        }
+    }
+
+    private fun show(personal: List<String>, learned: List<Pair<String, Int>>) {
         list.removeAllViews()
-        val personal = engine.personalWords().sorted()
         list.addView(section("Personal dictionary (${personal.size})"))
         if (personal.isEmpty()) list.addView(note("No words yet"))
         personal.forEach { list.addView(wordRow(it, null)) }
 
-        val learned = engine.learnedWords()
         list.addView(section("Learned from your typing (${learned.size})"))
         if (learned.isEmpty()) list.addView(note("Nothing learned yet"))
-        learned.take(300).forEach { (w, n) -> list.addView(wordRow(w, "used $n×")) }
+        learned.forEach { (w, n) -> list.addView(wordRow(w, "used $n×")) }
     }
 
     private fun note(s: String) = TextView(this).apply { text = s; setTextColor(subColor); setPadding(px(4f), px(4f), 0, px(4f)) }
@@ -141,7 +138,7 @@ class DictionaryActivity : AppCompatActivity() {
         if (meta != null) addView(TextView(context).apply { text = meta; setTextColor(subColor); textSize = 13f; setPadding(0, 0, px(8f), 0) })
         addView(mkButton(context, false, borderless = true).apply {
             text = "Remove"
-            setOnClickListener { io.execute { engine.removeWord(word); notifyService(); main.post { render() } } }
+            setOnClickListener { io.post { engine.removeWord(word); main.post { render() } } }
         })
     }
 
@@ -175,7 +172,7 @@ class DictionaryActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         val uri = data?.data ?: return
         if (resultCode != Activity.RESULT_OK) return
-        io.execute {
+        io.post {
             val msg = runCatching {
                 if (requestCode == EXPORT_REQ) {
                     contentResolver.openOutputStream(uri, "wt")?.use { it.write(engine.exportJson().toByteArray()) }
@@ -183,7 +180,6 @@ class DictionaryActivity : AppCompatActivity() {
                 } else {
                     val text = contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""
                     engine.importJson(text)
-                    notifyService()
                     "Imported"
                 }
             }.getOrElse { "Couldn't read that file" }
