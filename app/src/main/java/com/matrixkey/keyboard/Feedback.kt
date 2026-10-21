@@ -25,13 +25,6 @@ class Feedback(context: Context) {
     var soundEnabled = false
     var volume = 40
 
-    private val supportsPrimitives: Boolean by lazy {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && vibrator?.areAllPrimitivesSupported(
-            VibrationEffect.Composition.PRIMITIVE_CLICK,
-            VibrationEffect.Composition.PRIMITIVE_TICK
-        ) == true
-    }
-
     /** A normal key press. */
     fun key(view: View, type: KeyType = KeyType.CHAR) {
         if (hapticEnabled) click(view)
@@ -49,10 +42,9 @@ class Feedback(context: Context) {
     private val hasAmplitude: Boolean by lazy { vibrator?.hasAmplitudeControl() == true }
 
     /**
-     * Key press, scaled by the strength slider so every step is felt:
-     *  - lower 60%: the motor's crisp click effect, from a faint tap to a full click;
-     *  - upper 40%: a full-power pulse that gets longer (14–40 ms), for a firm thump.
-     * Phones without click effects get a pulse whose power and length both scale.
+     * Key press, scaled by the strength slider across the motor's whole range:
+     * both power (about 10% to 100%) and length (6 to 50 ms) grow with the
+     * slider, so 0 is a faint tick and 100 a firm thump.
      */
     private fun click(view: View) {
         val v = vibrator
@@ -64,19 +56,23 @@ class Feedback(context: Context) {
     }
 
     private fun vibrateAt(v: Vibrator, s: Float) {
-        if (s <= 0f) return
-        if (supportsPrimitives && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && s <= 0.6f) {
-            val scale = (0.12f + s / 0.6f * 0.88f).coerceIn(0.05f, 1f)
-            v.vibrate(VibrationEffect.startComposition().addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, scale).compose())
-            return
+        val ms = (6 + 44 * s).toLong()
+        val amp = if (hasAmplitude) (25 + 230 * Math.pow(s.toDouble(), 1.3)).toInt().coerceIn(1, 255) else VibrationEffect.DEFAULT_AMPLITUDE
+        play(v, VibrationEffect.createOneShot(ms, amp))
+    }
+
+    /**
+     * Android scales "touch" vibrations by the phone's own touch-feedback
+     * intensity, which squashed the slider into a narrow, faint band. Played
+     * as media vibrations, the slider controls the strength itself.
+     */
+    private fun play(v: Vibrator, effect: VibrationEffect) {
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+                v.vibrate(effect, android.os.VibrationAttributes.createForUsage(android.os.VibrationAttributes.USAGE_MEDIA))
+            else -> @Suppress("DEPRECATION") v.vibrate(effect,
+                android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).build())
         }
-        val (ms, amp) = if (supportsPrimitives) {
-            val t = ((s - 0.6f) / 0.4f).coerceIn(0f, 1f)
-            (14 + 26 * t).toLong() to 255
-        } else {
-            (6 + 34 * s).toLong() to (30 + 225 * s).toInt().coerceIn(1, 255)
-        }
-        v.vibrate(VibrationEffect.createOneShot(ms, if (hasAmplitude) amp else VibrationEffect.DEFAULT_AMPLITUDE))
     }
 
     /** Plays one key press at [strengthPercent] (0–100), for the settings slider preview. */
@@ -98,7 +94,7 @@ class Feedback(context: Context) {
         if (v != null && v.hasVibrator()) {
             val ms = (4 + 8 * s).toLong()
             val amp = if (hasAmplitude) (80 + 175 * s).toInt().coerceIn(1, 255) else VibrationEffect.DEFAULT_AMPLITUDE
-            v.vibrate(VibrationEffect.createOneShot(ms, amp))
+            play(v, VibrationEffect.createOneShot(ms, amp))
         } else {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
         }
