@@ -70,25 +70,50 @@ class AiClient(private val prefs: Prefs) {
         get() = prefs.geminiModel.let { it == "auto" || it == "gemini-2.5-flash" }
 
     private fun gemini(user: String): String {
-        if (!autoModel) return geminiCall(prefs.geminiModel, user)
-        val cached = prefs.sp.getString("gemini_resolved_model", null)
-        val model = cached ?: pickModel(null)
-        return try {
-            geminiCall(model, user)
-        } catch (e: Http.HttpError) {
-            // Model retired or not offered to this key: refresh the list and retry once.
-            val modelProblem = e.code == 404 || (e.code == 400 && e.body.contains("model", ignoreCase = true))
-            if (!modelProblem) throw e
-            prefs.sp.edit().remove("gemini_resolved_model").apply()
-            geminiCall(pickModel(model), user)
+        if (!autoModel) return withRetry { geminiCall(prefs.geminiModel, user) }
+        val ranked = rankedModels()
+        var lastErr: Exception? = null
+        // Try the best model, then the next ones if Google says a model is busy
+        // (503/500/429) or unavailable to this key (404).
+        for ((i, model) in ranked.take(4).withIndex()) {
+            try {
+                val out = if (i == 0) withRetry { geminiCall(model, user) } else geminiCall(model, user)
+                prefs.sp.edit().putString("gemini_resolved_model", model).apply()
+                return out
+            } catch (e: Http.HttpError) {
+                lastErr = e
+                val tryNext = e.code in listOf(404, 429, 500, 503) ||
+                    (e.code == 400 && e.body.contains("model", ignoreCase = true))
+                if (!tryNext) throw e
+                if (e.code == 404) prefs.sp.edit().remove("models_cache").apply()
+            }
         }
+        throw lastErr ?: Exception("No Gemini model answered")
     }
 
-    /**
-     * Lists the models this key can call and picks the newest stable "Flash"
-     * text model (fast, and on the free tier). The choice is remembered.
-     */
-    private fun pickModel(exclude: String?): String {
+    /** One quick retry after a short pause when the service is momentarily busy. */
+    private fun <T> withRetry(block: () -> T): T = try {
+        block()
+    } catch (e: Http.HttpError) {
+        if (e.code == 503 || e.code == 500) { Thread.sleep(1200); block() } else throw e
+    }
+
+    /** Usable Flash models, best first; the last model that worked leads. Cached for a day. */
+    private fun rankedModels(): List<String> {
+        val now = System.currentTimeMillis()
+        val cachedAt = prefs.sp.getLong("models_cache_at", 0)
+        val cached = prefs.sp.getString("models_cache", null)
+        val list = if (cached != null && now - cachedAt < 86_400_000L) cached.split(",").filter { it.isNotBlank() } else {
+            val fresh = listModels()
+            prefs.sp.edit().putString("models_cache", fresh.joinToString(",")).putLong("models_cache_at", now).apply()
+            fresh
+        }
+        if (list.isEmpty()) throw Exception("Your Gemini key has no Flash models available")
+        val last = prefs.sp.getString("gemini_resolved_model", null)
+        return if (last != null && last in list) listOf(last) + list.filter { it != last } else list
+    }
+
+    private fun listModels(): List<String> {
         val res = JSONObject(Http.get("$base/models?pageSize=200", keyHeader()))
         val models = res.optJSONArray("models") ?: JSONArray()
         val skip = listOf("image", "tts", "audio", "live", "embedding", "thinking", "exp", "learnlm")
@@ -100,16 +125,14 @@ class AiClient(private val prefs: Prefs) {
             val n = name.lowercase()
             if (!methods.contains("generateContent")) continue
             if (!n.startsWith("gemini") || !n.contains("flash")) continue
-            if (skip.any { n.contains(it) } || name == exclude) continue
+            if (skip.any { n.contains(it) }) continue
             usable += name
         }
         val versionRx = Regex("gemini-([0-9]+(?:\\.[0-9]+)?)")
         fun version(n: String) = versionRx.find(n)?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
-        val best = usable.sortedWith(
+        return usable.distinct().sortedWith(
             compareBy<String>({ it.contains("preview") }, { it.contains("lite") }, { -version(it) }, { it.length })
-        ).firstOrNull() ?: throw Exception("Your Gemini key has no Flash models available")
-        prefs.sp.edit().putString("gemini_resolved_model", best).apply()
-        return best
+        )
     }
 
     private fun geminiCall(model: String, user: String): String {
@@ -173,6 +196,7 @@ class AiClient(private val prefs: Prefs) {
             val main = when {
                 e is NoKey -> e.message ?: "Add an API key"
                 e is Http.HttpError && e.code == 429 -> "Free limit reached. Try again in a minute."
+                e is Http.HttpError && (e.code == 503 || e.code == 500) -> "Gemini is busy right now. Try again in a moment, or add a free Groq key as a backup in Settings › AI writing."
                 e is Http.HttpError && (e.code == 401 || e.code == 403) -> "The API key was rejected (${e.code}). Check it in Settings › AI writing."
                 e is Http.HttpError && e.code == 400 && server.contains("API key", ignoreCase = true) -> "The API key isn't valid. Check it in Settings › AI writing."
                 e is Http.HttpError -> "The AI service returned an error (${e.code})."
