@@ -52,6 +52,7 @@ class WordEngine(private val context: Context) {
                     val w = (if (sp > 0) line.substring(0, sp) else line).trim().lowercase()
                     val count = if (sp > 0) line.substring(sp + 1).trim().toLongOrNull() ?: 1L else 1L
                     if (w.isEmpty() || !w.all { it.isLetter() || it == '\'' }) return@forEach
+                    if (w.startsWith('\'') || w.endsWith('\'')) return@forEach
                     if (w.length == 1 && w != "a" && w != "i") return@forEach
                     if (base.containsKey(w)) return@forEach
                     base[w] = ln(count.toFloat() + 1f)
@@ -65,8 +66,19 @@ class WordEngine(private val context: Context) {
         ready = true
     }
 
+    /** "dont" → "don't" for every contraction in the word list. */
+    private val contractions = HashMap<String, String>()
+
     private fun rebuildIndexes() {
-        byLength.clear(); byEnds.clear()
+        byLength.clear(); byEnds.clear(); contractions.clear()
+        for ((w, f) in base) {
+            if ('\'' !in w) continue
+            val plain = w.replace("'", "")
+            val cur = contractions[plain]
+            if (cur == null || (base[cur] ?: 0f) < f) contractions[plain] = w
+        }
+        listOf("i'm", "i've", "i'll", "i'd").forEach { casing[it] = it.replaceFirstChar { c -> c.uppercase() } }
+        casing["i"] = "I"
         val all = HashSet<String>(base.keys).apply { addAll(personal); addAll(userCounts.filterValues { it >= LEARN_AFTER }.keys) }
         all.removeAll(blocked)
         for (w in all) {
@@ -149,6 +161,7 @@ class WordEngine(private val context: Context) {
             }
         }
 
+        contraction?.let { if (it !in candidates) candidates[it] = freq(it) }
         val filtered = candidates.entries
             .filter { !blockOffensive || it.key !in OFFENSIVE || it.key == lower }
             .sortedByDescending { it.value }
@@ -160,14 +173,30 @@ class WordEngine(private val context: Context) {
         // Autocorrect only when the typed word is unknown (or a learned typo),
         // and the best candidate is clearly a correction, not just a longer completion.
         var auto: String? = null
-        if (allowAutocorrect && lower.length >= 2) {
+        // "dont" → "don't", "im" → "I'm"
+        val typedKnownEarly = isKnown(lower)
+        val contraction = contractions[lower]?.takeIf { !typedKnownEarly || lower in CONTRACTION_TYPOS }
+        if (contraction != null && (userCounts[lower] ?: 0) == 0) {
+            candidates[contraction] = (candidates.values.maxOrNull() ?: 0f) + 1f
+            if (allowAutocorrect) auto = contraction
+        }
+        // "i" → "I"
+        if (auto == null && allowAutocorrect && lower in I_WORDS && typed == lower) auto = lower
+        if (auto == null && allowAutocorrect && lower.length >= 2) {
             val top = filtered.firstOrNull()
             if (top != null) {
                 val topScore = candidates[top] ?: 0f
                 val isHabit = habits[lower] == top
-                val isCorrection = editDistance(lower, top, maxDist) <= maxDist && !top.startsWith(lower)
+                val dist = editDistance(lower, top, maxDist)
+                val isCorrection = dist <= maxDist && !top.startsWith(lower)
+                // The word list contains common misspellings ("tommorow"), so a
+                // "known" word that's far rarer than a close match still gets fixed,
+                // unless you've typed it yourself before.
+                val rareMisspelling = typedKnown && isCorrection && lower.length > 3 && top.length >= lower.length &&
+                    dist <= 1.6f && (userCounts[lower] ?: 0) == 0 && lower !in personal &&
+                    freq(top) - freq(lower) > 5f
                 if (isHabit || (!typedKnown && (isCorrection || (top.startsWith(lower) && top.length - lower.length <= 1))) ||
-                    (typedKnown && isCorrection && topScore - typedScore > 9f && lower.length > 3)
+                    (typedKnown && isCorrection && topScore - typedScore > 9f && lower.length > 3) || rareMisspelling
                 ) auto = top
             }
         }
@@ -479,6 +508,15 @@ class WordEngine(private val context: Context) {
     companion object {
         /** A new word becomes a suggestion after you've typed it this many times. */
         const val LEARN_AFTER = 2
+
+        private val I_WORDS = setOf("i", "i'm", "i've", "i'll", "i'd")
+
+        /** Real words that are almost always a missing apostrophe. */
+        private val CONTRACTION_TYPOS = setOf(
+            "dont", "cant", "wont", "im", "ive", "thats", "whats", "youre", "theyre", "didnt", "doesnt", "isnt",
+            "wasnt", "arent", "werent", "havent", "hasnt", "couldnt", "wouldnt", "shouldnt", "aint", "youve",
+            "theyve", "weve", "youll", "theyll", "itll", "thatll", "wouldve", "couldve", "shouldve", "whos", "theres",
+        )
 
         fun matchCase(typed: String, word: String): String = when {
             typed.length > 1 && typed.all { !it.isLetter() || it.isUpperCase() } -> word.uppercase()
