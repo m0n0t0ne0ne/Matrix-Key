@@ -16,7 +16,6 @@ import android.text.InputType
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowInsets
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
@@ -598,6 +597,8 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         val caps = shift
         engineHandler.post {
             val words = engine.decodeGlide(path, prev, prefs.blockOffensive)
+            // Personal-dictionary entries that start with the glided word (e.g. "kevin" → your email).
+            val mine = words.firstOrNull()?.let { first -> engine.personalMatches(first).filter { !it.equals(first, true) } }.orEmpty()
             main.post {
                 if (words.isEmpty()) return@post
                 var w = words.first()
@@ -609,9 +610,9 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                 phantomSpaceWasAuto = true
                 lastGlide = w
                 lastCorrection = null
-                glideAlternatives = words.drop(1).map { alt ->
+                glideAlternatives = (mine + words.drop(1).map { alt ->
                     if (caps == ShiftState.LOCKED) alt.uppercase() else if (caps == ShiftState.ON) alt.replaceFirstChar { it.uppercase() } else alt
-                }
+                }).distinct()
                 if (shift == ShiftState.ON) setShift(ShiftState.OFF)
                 learn(w, null)
                 showGlideAlternatives(w)
@@ -621,7 +622,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
 
     private fun showGlideAlternatives(chosen: String) {
         val alts = glideAlternatives
-        currentSuggestions = listOf(alts.getOrElse(0) { "" }, chosen, alts.getOrElse(1) { "" })
+        currentSuggestions = listOf(alts.getOrElse(0) { "" }, chosen, alts.getOrElse(1) { "" }) + alts.drop(2)
         topBar.suggestions = currentSuggestions
         topBar.emphasized = 1
         topBar.mode = TopBarView.BarMode.SUGGESTIONS
@@ -744,7 +745,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             val mine = if (token.isNotEmpty()) engine.personalMatches(token) else emptyList()
             tokenSuggestions = mine.isNotEmpty()
             currentSuggestions = when {
-                mine.isNotEmpty() -> when (mine.size) { 1 -> listOf("", mine[0], ""); 2 -> listOf(mine[1], mine[0], ""); else -> listOf(mine[1], mine[0], mine[2]) }
+                mine.isNotEmpty() -> centered(mine)
                 !isPassword && typed.isEmpty() && afterWord() -> PUNCTUATION
                 else -> emptyList()
             }
@@ -773,7 +774,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                 if (tok.any { it == '@' || it == '.' || it == '_' || it == '-' }) {
                     val mine = engine.personalMatches(tok)
                     if (mine.isNotEmpty()) {
-                        currentSuggestions = listOf(mine.getOrElse(1) { "" }, mine[0], mine.getOrElse(2) { "" })
+                        currentSuggestions = centered(mine)
                         tokenSuggestions = true
                         autoCorrection = null
                         showToolbarOrSuggestions()
@@ -799,16 +800,23 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         return last.isLetterOrDigit() || (last == ' ' && before.length == 2 && before[0].isLetterOrDigit())
     }
 
-    /** Middle slot = what space will insert; left = what you typed; right = next best (or an emoji). */
+    /** Best item in the middle, second on the left, third on the right, the rest after (scroll to see). */
+    private fun centered(list: List<String>): List<String> =
+        if (list.isEmpty()) emptyList()
+        else listOf(list.getOrElse(1) { "" }, list[0], list.getOrElse(2) { "" }) + list.drop(3)
+
+    /**
+     * Middle slot = what space will insert; left = what you typed; right = next best (or an emoji).
+     * Remaining candidates follow, reached by scrolling the bar.
+     */
     private fun arrange(typed: String, list: List<String>, auto: String?): List<String> {
-        if (typed.isEmpty()) {
-            return when (list.size) {
-                0 -> emptyList()
-                1 -> listOf("", list[0], "")
-                2 -> listOf(list[1], list[0], "")
-                else -> listOf(list[1], list[0], list[2])
-            }
-        }
+        if (typed.isEmpty()) return centered(list)
+        val three = arrangeThree(typed, list, auto)
+        val extras = list.filter { c -> three.none { it.equals(c, true) || it.equals("\u201C$c\u201D", true) } && !c.equals(typed, true) }
+        return three + extras
+    }
+
+    private fun arrangeThree(typed: String, list: List<String>, auto: String?): List<String> {
         val emoji = if (prefs.emojiSuggestions) EmojiData.forWord(auto ?: typed) else null
         return if (auto != null) {
             val others = list.filter { !it.equals(typed, true) && it != auto }
@@ -857,7 +865,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                     ic.commitText(s, 1)
                     lastGlide = s
                     val p = prevWord
-                    if (!noLearning) engineHandler.post { engine.learnGlide(s); engine.learnWord(s, p) }
+                    if (!noLearning && s.all { it.isLetter() || it == '\'' }) engineHandler.post { engine.learnGlide(s); engine.learnWord(s, p) }
                     glideAlternatives = (listOf(glided) + glideAlternatives).filter { it != s }
                     showGlideAlternatives(s)
                 }

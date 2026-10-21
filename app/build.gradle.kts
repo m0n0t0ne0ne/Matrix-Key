@@ -13,8 +13,10 @@ android {
         applicationId = "com.matrixkey"
         minSdk = 29
         targetSdk = 34
-        versionCode = 22
-        versionName = "Update 21"
+        versionCode = 23
+        versionName = "Update 22"
+        // Nothing phones (and nearly every phone since 2019) are 64-bit ARM.
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     // A fixed key committed to the repo, so every build can be installed as an
@@ -31,7 +33,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 strips unused library code and resources from the release APK.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("matrixkey")
         }
         debug {
@@ -46,9 +51,6 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-    androidResources {
-        noCompress += listOf("txt")
-    }
 }
 
 dependencies {
@@ -56,8 +58,10 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.preference:preference-ktx:1.2.1")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
-    // On-device text recognition (Scan text). The model ships inside the app, works offline.
-    implementation("com.google.mlkit:text-recognition:16.0.1")
+    // On-device text recognition (Scan text), via Google Play services: the model is
+    // shared with other apps instead of being bundled (saves ~40 MB). Works offline
+    // once Play services has downloaded it.
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
     implementation("com.google.android.material:material:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

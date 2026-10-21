@@ -10,7 +10,9 @@ import android.os.SystemClock
 import android.text.TextUtils
 import android.text.TextPaint
 import android.view.MotionEvent
+import android.view.VelocityTracker
 import android.view.View
+import android.widget.OverScroller
 import androidx.core.graphics.ColorUtils
 import com.matrixkey.theme.KeyboardTheme
 
@@ -42,7 +44,7 @@ class TopBarView(context: Context) : View(context) {
     /** Called on every successful tap, for haptic feedback. */
     var onTapFeedback: (() -> Unit)? = null
 
-    companion object { const val MAX_SLOTS = 7 }
+    companion object { const val MAX_ITEMS = 12 }
 
     var listener: Listener? = null
     lateinit var theme: KeyboardTheme
@@ -51,10 +53,18 @@ class TopBarView(context: Context) : View(context) {
 
     var mode = BarMode.SUGGESTIONS
         set(v) { field = v; invalidate() }
-    /** Three slots: left, middle, right. Empty strings are blank slots. */
-    /** Usually three slots (left, middle, right); a punctuation row uses more. */
+    /**
+     * Left, middle, right, then any extra suggestions (reached by scrolling the
+     * strip). Text is always drawn at full size: long words widen their slot and
+     * the strip scrolls instead of shrinking them.
+     */
     var suggestions: List<String> = listOf("", "", "")
-        set(v) { field = if (v.size > 3) v.take(MAX_SLOTS) else (v + listOf("", "", "")).take(3); invalidate() }
+        set(v) {
+            field = if (v.size >= 3) v.take(MAX_ITEMS) else (v + listOf("", "", "")).take(3)
+            scrollPos = 0f
+            scroller.forceFinished(true)
+            invalidate()
+        }
     /** Slot drawn emphasized (the word that space will insert). */
     var emphasized = -1
     var tools: List<Tool> = Tool.values().toList()
@@ -75,8 +85,18 @@ class TopBarView(context: Context) : View(context) {
 
     private val leftBtn = RectF()
     private val rightBtn = RectF()
-    private val slots = Array(MAX_SLOTS) { RectF() }
-    private val slotCount get() = suggestions.size.coerceIn(3, MAX_SLOTS)
+    // Scrollable suggestion strip: item i spans [itemLeft[i], itemRight[i]] in strip coordinates.
+    private val strip = RectF()
+    private var itemLeft = FloatArray(0)
+    private var itemRight = FloatArray(0)
+    private var contentWidth = 0f
+    private var scrollPos = 0f
+    private val scroller = OverScroller(context)
+    private var velocity: VelocityTracker? = null
+    private var dragging = false
+    private var downX = 0f
+    private var lastX = 0f
+    private var pressedItem = -1
     private val toolRects = ArrayList<RectF>()
     private val searchBox = RectF()
     private var pressed: Any? = null
@@ -91,13 +111,8 @@ class TopBarView(context: Context) : View(context) {
         val top = (h - btn) / 2
         leftBtn.set(6 * dp, top, 6 * dp + btn, top + btn)
         rightBtn.set(width - 6 * dp - btn, top, width - 6 * dp, top + btn)
-        val l = leftBtn.right + 6 * dp
-        val r = rightBtn.left - 6 * dp
-        val n0 = slotCount
-        val w = (r - l) / n0
-        for (i in 0 until MAX_SLOTS) {
-            if (i < n0) slots[i].set(l + i * w, top, l + (i + 1) * w, top + btn) else slots[i].setEmpty()
-        }
+        strip.set(leftBtn.right + 6 * dp, top, rightBtn.left - 6 * dp, top + btn)
+        layoutStrip(btn)
         val n = tools.size
         while (toolRects.size < n) toolRects += RectF()
         while (toolRects.size > n) toolRects.removeAt(toolRects.size - 1)
@@ -108,6 +123,45 @@ class TopBarView(context: Context) : View(context) {
             toolRects[i].set(cx - btn / 2, top, cx + btn / 2, top + btn)
         }
         searchBox.set(leftBtn.right + 6 * dp, top, rightBtn.left - 6 * dp, top + btn)
+    }
+
+    private fun suggestionTextSize(btn: Float) = btn * 0.46f
+
+    private fun layoutStrip(btn: Float) {
+        val items = suggestions
+        val n = items.size
+        text.typeface = typeface
+        text.textSize = suggestionTextSize(btn)
+        // Each item wants its text width plus padding. If everything fits, items share
+        // the bar (equal slots when they can); otherwise they keep their natural
+        // width (the first three at least a third each) and the strip scrolls.
+        if (itemLeft.size != n) { itemLeft = FloatArray(n); itemRight = FloatArray(n) }
+        val natural = FloatArray(n) { if (items[it].isEmpty()) 44 * dp else maxOf(44 * dp, text.measureText(items[it]) + 28 * dp) }
+        val avail = strip.width()
+        val equal = avail / n.coerceAtLeast(1)
+        val sum = natural.sum()
+        var x = 0f
+        for (i in 0 until n) {
+            val w = when {
+                natural.all { it <= equal } -> equal
+                sum <= avail -> natural[i] + (avail - sum) / n
+                i < 3 -> maxOf(natural[i], avail / 3f)
+                else -> natural[i]
+            }
+            itemLeft[i] = x; itemRight[i] = x + w
+            x += w
+        }
+        contentWidth = x
+        scrollPos = scrollPos.coerceIn(0f, maxScroll())
+    }
+
+    private fun maxScroll() = (contentWidth - strip.width()).coerceAtLeast(0f)
+
+    override fun computeScroll() {
+        if (scroller.computeScrollOffset()) {
+            scrollPos = scroller.currX.toFloat().coerceIn(0f, maxScroll())
+            postInvalidateOnAnimation()
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -137,10 +191,16 @@ class TopBarView(context: Context) : View(context) {
         roundButton(canvas, leftBtn, Icon.CHEVRON_RIGHT, t.chip, t.text)
         roundButton(canvas, rightBtn, Icon.CLIPBOARD, t.chip, t.text)
         text.typeface = typeface
-        for (i in 0 until slotCount) {
+        text.textSize = suggestionTextSize(strip.height())
+        val fm = text.fontMetrics
+        canvas.save()
+        canvas.clipRect(strip)
+        val r = RectF()
+        for (i in suggestions.indices) {
+            r.set(strip.left + itemLeft[i] - scrollPos, strip.top, strip.left + itemRight[i] - scrollPos, strip.bottom)
+            if (r.right < strip.left || r.left > strip.right) continue
             val s = suggestions[i]
-            val r = slots[i]
-            if (pressed === r && s.isNotEmpty()) {
+            if (pressedItem == i && s.isNotEmpty()) {
                 fill.color = ColorUtils.setAlphaComponent(t.text, 24)
                 canvas.drawRoundRect(r, 10 * dp, 10 * dp, fill)
             }
@@ -151,13 +211,20 @@ class TopBarView(context: Context) : View(context) {
             if (s.isEmpty()) continue
             text.color = if (i == emphasized) t.text else t.sub
             text.isFakeBoldText = i == emphasized && !dotStyle
-            text.textSize = r.height() * 0.46f
-            val avail = r.width() - 8 * dp
-            while (text.measureText(s) > avail && text.textSize > r.height() * 0.28f) text.textSize *= 0.92f
-            val shown = TextUtils.ellipsize(s, text, avail, TextUtils.TruncateAt.END).toString()
-            val fm = text.fontMetrics
-            canvas.drawText(shown, r.centerX(), r.centerY() - (fm.ascent + fm.descent) / 2, text)
+            canvas.drawText(s, r.centerX(), r.centerY() - (fm.ascent + fm.descent) / 2, text)
         }
+        canvas.restore()
+        // A soft fade at an edge shows there's more to scroll to.
+        if (scrollPos < maxScroll() - 1) edgeFade(canvas, strip.right - 18 * dp, strip.right, t.bg, toRight = true)
+        if (scrollPos > 1) edgeFade(canvas, strip.left, strip.left + 18 * dp, t.bg, toRight = false)
+    }
+
+    private fun edgeFade(canvas: Canvas, l: Float, r: Float, color: Int, toRight: Boolean) {
+        val clear = ColorUtils.setAlphaComponent(color, 0)
+        fill.shader = android.graphics.LinearGradient(l, 0f, r, 0f,
+            if (toRight) clear else color, if (toRight) color else clear, android.graphics.Shader.TileMode.CLAMP)
+        canvas.drawRect(l, strip.top, r, strip.bottom, fill)
+        fill.shader = null
     }
 
     private fun drawToolbar(canvas: Canvas) {
@@ -191,7 +258,7 @@ class TopBarView(context: Context) : View(context) {
         val r = RectF(searchBox).apply { inset(dp, dp) }
         canvas.drawRoundRect(r, r.height() / 2, r.height() / 2, outline)
         leftText.typeface = Typeface.DEFAULT
-        leftText.textSize = 16 * resources.displayMetrics.scaledDensity
+        leftText.textSize = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 16f, resources.displayMetrics)
         val pad = 16 * dp
         val avail = searchBox.width() - pad * 2
         val fm = leftText.fontMetrics
@@ -221,7 +288,7 @@ class TopBarView(context: Context) : View(context) {
         roundButton(canvas, leftBtn, Icon.CLOSE, t.chip, t.text)
         leftText.typeface = Typeface.DEFAULT
         leftText.color = t.text
-        leftText.textSize = 15 * resources.displayMetrics.scaledDensity
+        leftText.textSize = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 15f, resources.displayMetrics)
         val l = leftBtn.right + 12 * dp
         val avail = width - l - 12 * dp
         val shown = TextUtils.ellipsize(message, leftText, avail, TextUtils.TruncateAt.START).toString()
@@ -239,7 +306,6 @@ class TopBarView(context: Context) : View(context) {
         when (mode) {
             BarMode.SUGGESTIONS -> {
                 if (rightBtn.contains(x, y)) return rightBtn
-                for (i in 0 until slotCount) if (slots[i].contains(x, y)) return slots[i]
             }
             BarMode.TOOLBAR -> {
                 // Whole-cell hit areas, so taps between icons still count.
@@ -256,8 +322,68 @@ class TopBarView(context: Context) : View(context) {
         return null
     }
 
+    private fun itemAt(x: Float): Int {
+        val cx = x - strip.left + scrollPos
+        for (i in suggestions.indices) if (cx >= itemLeft[i] && cx < itemRight[i]) return i
+        return -1
+    }
+
+    /** Taps, long-presses and horizontal scrolling inside the suggestion strip. */
+    private fun stripTouch(e: MotionEvent): Boolean {
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                scroller.forceFinished(true)
+                velocity?.recycle(); velocity = VelocityTracker.obtain().also { it.addMovement(e) }
+                dragging = false
+                downX = e.x; lastX = e.x
+                pressedItem = itemAt(e.x)
+                downTime = SystemClock.uptimeMillis()
+                invalidate()
+            }
+            MotionEvent.ACTION_MOVE -> {
+                velocity?.addMovement(e)
+                if (!dragging && kotlin.math.abs(e.x - downX) > 8 * dp && maxScroll() > 0f) {
+                    dragging = true; pressedItem = -1
+                }
+                if (dragging) {
+                    scrollPos = (scrollPos - (e.x - lastX)).coerceIn(0f, maxScroll())
+                    invalidate()
+                }
+                lastX = e.x
+            }
+            MotionEvent.ACTION_UP -> {
+                velocity?.addMovement(e)
+                if (dragging) {
+                    velocity?.computeCurrentVelocity(1000)
+                    val vx = velocity?.xVelocity ?: 0f
+                    scroller.fling(scrollPos.toInt(), 0, (-vx).toInt(), 0, 0, maxScroll().toInt(), 0, 0)
+                    postInvalidateOnAnimation()
+                } else {
+                    val i = pressedItem
+                    if (i >= 0 && itemAt(e.x) == i && suggestions[i].isNotEmpty()) {
+                        onTapFeedback?.invoke()
+                        val long = SystemClock.uptimeMillis() - downTime > longPressMs
+                        if (long) listener?.onSuggestionLongPress(i) else listener?.onSuggestion(i)
+                    }
+                }
+                pressedItem = -1
+                velocity?.recycle(); velocity = null
+                invalidate()
+            }
+            MotionEvent.ACTION_CANCEL -> { pressedItem = -1; dragging = false; invalidate() }
+        }
+        return true
+    }
+
+    private var stripGesture = false
+
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        if (e.actionMasked == MotionEvent.ACTION_DOWN) {
+            layoutRects()
+            stripGesture = mode == BarMode.SUGGESTIONS && strip.contains(e.x, e.y)
+        }
+        if (stripGesture) return stripTouch(e)
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 layoutRects()
@@ -270,27 +396,20 @@ class TopBarView(context: Context) : View(context) {
                 pressed = null
                 invalidate()
                 if (target == null || hitTarget(e.x, e.y) !== target) return true
-                val long = SystemClock.uptimeMillis() - downTime > longPressMs
-                val isBlankSlot = mode == BarMode.SUGGESTIONS && slots.any { it === target } &&
-                    suggestions.getOrElse(slots.indexOfFirst { it === target }) { "" }.isEmpty()
-                if (!isBlankSlot) onTapFeedback?.invoke()
-                click(target, long)
+                onTapFeedback?.invoke()
+                click(target)
             }
             MotionEvent.ACTION_CANCEL -> { pressed = null; invalidate() }
         }
         return true
     }
 
-    private fun click(target: Any, long: Boolean) {
+    private fun click(target: Any) {
         val l = listener ?: return
         when (mode) {
             BarMode.SUGGESTIONS -> when {
                 target === leftBtn -> l.onToggleToolbar()
                 target === rightBtn -> l.onTool(Tool.CLIPBOARD)
-                else -> {
-                    val i = slots.indexOfFirst { it === target }
-                    if (i >= 0 && suggestions[i].isNotEmpty()) if (long) l.onSuggestionLongPress(i) else l.onSuggestion(i)
-                }
             }
             BarMode.TOOLBAR -> if (target === leftBtn) {
                 if (panelOpen) l.onBackToKeyboard() else l.onToggleToolbar()

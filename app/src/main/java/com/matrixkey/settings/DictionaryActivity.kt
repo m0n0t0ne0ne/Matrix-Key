@@ -10,7 +10,6 @@ import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView

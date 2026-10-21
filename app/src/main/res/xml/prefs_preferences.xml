@@ -52,7 +52,7 @@
             app:iconSpaceReserved="false" />
         <ListPreference
             android:key="kb_height"
-            android:title="Keyboard height (bigger keys = bigger letters)"
+            android:title="Keyboard height"
             android:defaultValue="1.0"
             android:entries="@array/height_entries"
             android:entryValues="@array/height_values"

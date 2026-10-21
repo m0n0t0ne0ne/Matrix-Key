@@ -242,7 +242,7 @@ class WordEngine(private val context: Context) {
 
         val list = ArrayList<String>()
         if (auto != null) list += auto
-        filtered.forEach { if (list.size < 6 && it !in list) list += it }
+        filtered.forEach { if (list.size < 10 && it !in list) list += it }
         return Result(list.map { matchCase(typed, display(it)) }, auto?.let { matchCase(typed, display(it)) })
     }
 
@@ -429,19 +429,6 @@ class WordEngine(private val context: Context) {
         return out
     }
 
-    private fun coverage(path: List<PointF>, keys: List<PointF>): Float {
-        var total = 0f
-        for (k in keys) {
-            var best = Float.MAX_VALUE
-            for (p in path) {
-                val d = dist(p, k)
-                if (d < best) best = d
-            }
-            total += max(0f, best / keyWidth - 0.55f)
-        }
-        return total
-    }
-
     private fun dist(a: PointF, b: PointF): Float {
         val dx = a.x - b.x; val dy = a.y - b.y
         return sqrt(dx * dx + dy * dy)
@@ -534,7 +521,7 @@ class WordEngine(private val context: Context) {
     fun personalMatches(prefix: String): List<String> {
         val p = prefix.lowercase()
         if (p.isEmpty()) return emptyList()
-        return personal.filter { it.startsWith(p) && it != p }.sortedBy { it.length }.map { display(it) }.take(3)
+        return personal.filter { it.startsWith(p) && it != p }.sortedBy { it.length }.map { display(it) }.take(6)
     }
     fun learnedWords(): List<Pair<String, Int>> =
         userCounts.filter { !base.containsKey(it.key) && it.key !in personal && it.value >= LEARN_AFTER }

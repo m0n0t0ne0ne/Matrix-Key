@@ -154,7 +154,12 @@ class ScanActivity : AppCompatActivity() {
                     insert.isEnabled = true
                 }
             }
-            .addOnFailureListener { status.text = "Couldn't read text: ${it.message}" }
+            .addOnFailureListener {
+                val m = it.message.orEmpty()
+                status.text = if (m.contains("download", true))
+                    "Google Play services is still downloading the text reader. Try again in a minute."
+                else "Couldn't read text: $m"
+            }
     }
 
     private fun done() {
