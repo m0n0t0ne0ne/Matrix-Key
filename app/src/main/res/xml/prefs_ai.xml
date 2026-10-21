@@ -43,7 +43,8 @@
         <EditTextPreference
             android:key="groq_model"
             android:title="Groq model"
-            android:defaultValue="llama-3.3-70b-versatile"
+            android:defaultValue="auto"
+            android:dialogMessage="Leave as auto to use the best current model your key allows, or type an exact model ID."
             app:useSimpleSummaryProvider="true"
             app:iconSpaceReserved="false" />
     </com.matrixkey.settings.DotCategory>

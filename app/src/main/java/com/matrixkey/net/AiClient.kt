@@ -164,23 +164,73 @@ class AiClient(private val prefs: Prefs) {
     // Groq
     // ------------------------------------------------------------------
 
+    private val groqBase = "https://api.groq.com/openai/v1"
+    private fun groqHeader() = mapOf("Authorization" to "Bearer ${prefs.groqKey}")
+
+    /** "auto" (or the old built-in default) lets the keyboard pick a current Groq model. */
+    private val groqAuto: Boolean
+        get() = prefs.groqModel.let { it == "auto" || it == "llama-3.3-70b-versatile" }
+
     private fun groq(user: String): String {
+        if (!groqAuto) return groqCall(prefs.groqModel, user)
+        val ranked = groqModels()
+        var lastErr: Exception? = null
+        for (model in ranked.take(4)) {
+            try {
+                val out = groqCall(model, user)
+                prefs.sp.edit().putString("groq_resolved_model", model).apply()
+                return out
+            } catch (e: Http.HttpError) {
+                lastErr = e
+                val retired = e.code == 404 || (e.code == 400 && (e.body.contains("decommission", true) || e.body.contains("model", true)))
+                if (!retired && e.code !in listOf(429, 500, 503)) throw e
+                if (retired) prefs.sp.edit().remove("groq_models_cache").apply()
+            }
+        }
+        throw lastErr ?: Exception("No Groq model answered")
+    }
+
+    /** Chat models this Groq key can use, best for writing first. Cached for a day. */
+    private fun groqModels(): List<String> {
+        val now = System.currentTimeMillis()
+        val cached = prefs.sp.getString("groq_models_cache", null)
+        val list = if (cached != null && now - prefs.sp.getLong("groq_models_cache_at", 0) < 86_400_000L) {
+            cached.split(",").filter { it.isNotBlank() }
+        } else {
+            val data = JSONObject(Http.get("$groqBase/models", groqHeader())).optJSONArray("data") ?: JSONArray()
+            val skip = listOf("whisper", "tts", "guard", "embed", "playai", "distil", "vision", "orpheus", "compound", "safeguard")
+            val ids = ArrayList<String>()
+            for (i in 0 until data.length()) {
+                val m = data.optJSONObject(i) ?: continue
+                if (m.has("active") && !m.optBoolean("active", true)) continue
+                val id = m.optString("id")
+                if (id.isBlank() || skip.any { id.lowercase().contains(it) }) continue
+                ids += id
+            }
+            val prefer = listOf("gpt-oss-120b", "llama-4-maverick", "kimi-k2", "llama-3.3-70b", "qwen3-32b", "llama-4-scout", "gpt-oss-20b", "llama-3.1-8b")
+            fun rank(id: String) = prefer.indexOfFirst { id.lowercase().contains(it) }.let { if (it < 0) prefer.size else it }
+            val sorted = ids.sortedWith(compareBy({ rank(it) }, { it.length }))
+            prefs.sp.edit().putString("groq_models_cache", sorted.joinToString(",")).putLong("groq_models_cache_at", now).apply()
+            sorted
+        }
+        if (list.isEmpty()) throw Exception("Your Groq key has no chat models available")
+        val last = prefs.sp.getString("groq_resolved_model", null)
+        return if (last != null && last in list) listOf(last) + list.filter { it != last } else list
+    }
+
+    private fun groqCall(model: String, user: String): String {
         val body = JSONObject().apply {
-            put("model", prefs.groqModel)
+            put("model", model)
             put("temperature", 0.4)
             put("messages", JSONArray()
                 .put(JSONObject().put("role", "system").put("content", system))
                 .put(JSONObject().put("role", "user").put("content", user)))
         }
-        val res = JSONObject(
-            Http.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                body.toString(),
-                mapOf("Authorization" to "Bearer ${prefs.groqKey}")
-            )
-        )
-        return res.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content")
+        val res = JSONObject(Http.post("$groqBase/chat/completions", body.toString(), groqHeader()))
+        val text = res.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content")
             ?: throw Exception("Groq returned no text")
+        // Some reasoning models wrap their thinking in <think> tags; keep only the answer.
+        return text.replace(Regex("(?s)<think>.*?</think>"), "").trim()
     }
 
     private fun clean(s: String): String {

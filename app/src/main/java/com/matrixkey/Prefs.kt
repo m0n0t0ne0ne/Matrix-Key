@@ -69,7 +69,8 @@ class Prefs(context: Context) {
     val geminiModel get() = s("gemini_model", "auto").trim().ifEmpty { "auto" }
     val aiBackup get() = b("ai_backup", true)
     val groqKey get() = s("groq_key", "").replace(Regex("\\s"), "")
-    val groqModel get() = s("groq_model", "llama-3.3-70b-versatile").trim().ifEmpty { "llama-3.3-70b-versatile" }
+    /** "auto" = pick a current model the key can use. */
+    val groqModel get() = s("groq_model", "auto").trim().ifEmpty { "auto" }
 
     // GIFs
     val gif get() = b("gif", true)
