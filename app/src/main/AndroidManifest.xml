@@ -54,6 +54,12 @@
             android:label="@string/dictionary" />
 
         <activity
+            android:name=".ScanActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:label="Scan text" />
+
+        <activity
             android:name=".settings.PermissionActivity"
             android:exported="false"
             android:excludeFromRecents="true"

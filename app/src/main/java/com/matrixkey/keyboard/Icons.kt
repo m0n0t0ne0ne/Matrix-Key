@@ -12,7 +12,7 @@ import android.graphics.RectF
  * With the dot font they're stroked as rows of round dots, matching the
  * dot-matrix look; otherwise as clean solid lines.
  */
-enum class Icon { SHIFT, CAPS, BACKSPACE, ENTER, SEARCH, SEND, NEXT, DONE, EMOJI, MIC, CHEVRON_RIGHT, CHEVRON_LEFT, CLIPBOARD, GIF, AI, SETTINGS, CLOSE, PIN, KEYBOARD, GRID }
+enum class Icon { SCAN, SHIFT, CAPS, BACKSPACE, ENTER, SEARCH, SEND, NEXT, DONE, EMOJI, MIC, CHEVRON_RIGHT, CHEVRON_LEFT, CLIPBOARD, GIF, AI, SETTINGS, CLOSE, PIN, KEYBOARD, GRID }
 
 object Icons {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -51,6 +51,7 @@ object Icons {
         Icon.CLOSE to p { moveTo(6f, 6f); lineTo(18f, 18f); moveTo(18f, 6f); lineTo(6f, 18f) },
         Icon.PIN to p { moveTo(9f, 4f); lineTo(15f, 4f); moveTo(10f, 4f); lineTo(10f, 10f); lineTo(7f, 14f); lineTo(17f, 14f); lineTo(14f, 10f); lineTo(14f, 4f); moveTo(12f, 14f); lineTo(12f, 20f) },
         Icon.KEYBOARD to p { roundRect(3f, 6f, 21f, 18f, 2f); moveTo(7f, 10f); lineTo(7.1f, 10f); moveTo(11f, 10f); lineTo(11.1f, 10f); moveTo(15f, 10f); lineTo(15.1f, 10f); moveTo(8f, 14.5f); lineTo(16f, 14.5f) },
+        Icon.SCAN to p { moveTo(4f, 8f); lineTo(4f, 5f); quadTo(4f, 4f, 5f, 4f); lineTo(8f, 4f); moveTo(16f, 4f); lineTo(19f, 4f); quadTo(20f, 4f, 20f, 5f); lineTo(20f, 8f); moveTo(20f, 16f); lineTo(20f, 19f); quadTo(20f, 20f, 19f, 20f); lineTo(16f, 20f); moveTo(8f, 20f); lineTo(5f, 20f); quadTo(4f, 20f, 4f, 19f); lineTo(4f, 16f); moveTo(8f, 9f); lineTo(16f, 9f); moveTo(8f, 12f); lineTo(16f, 12f); moveTo(8f, 15f); lineTo(13f, 15f) },
         Icon.GRID to p { roundRect(4f, 4f, 11f, 11f, 2f); roundRect(13f, 4f, 20f, 11f, 2f); roundRect(4f, 13f, 11f, 20f, 2f); roundRect(13f, 13f, 20f, 20f, 2f) },
     )
 

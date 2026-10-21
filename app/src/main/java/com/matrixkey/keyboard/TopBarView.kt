@@ -18,7 +18,7 @@ import com.matrixkey.theme.KeyboardTheme
 @SuppressLint("ViewConstructor")
 class TopBarView(context: Context) : View(context) {
 
-    enum class Tool { EMOJI, GIF, CLIPBOARD, AI, SETTINGS, MIC }
+    enum class Tool { EMOJI, GIF, CLIPBOARD, AI, SCAN, SETTINGS, MIC }
     enum class BarMode { SUGGESTIONS, TOOLBAR, SEARCH, MESSAGE }
 
     interface Listener {
@@ -170,6 +170,7 @@ class TopBarView(context: Context) : View(context) {
                 Tool.GIF -> Icon.GIF
                 Tool.CLIPBOARD -> Icon.CLIPBOARD
                 Tool.AI -> Icon.AI
+                Tool.SCAN -> Icon.SCAN
                 Tool.SETTINGS -> Icon.SETTINGS
                 Tool.MIC -> Icon.MIC
             }

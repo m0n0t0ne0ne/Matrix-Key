@@ -195,11 +195,23 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         closeTarget(redraw = false)
         hidePanel()
         readField(info)
+        insertPendingScan()
         selStart = info.initialSelStart; selEnd = info.initialSelEnd
         updateEnterIcon(info)
         setMode(modeFor(info))
         updateShiftFromField()
         refreshSuggestions()
+    }
+
+    /** Text picked in Scan text is inserted when you return to the app you were typing in. */
+    private fun insertPendingScan() {
+        val text = prefs.sp.getString(ScanActivity.PENDING, null) ?: return
+        val at = prefs.sp.getLong(ScanActivity.PENDING_AT, 0)
+        prefs.sp.edit().remove(ScanActivity.PENDING).remove(ScanActivity.PENDING_AT).apply()
+        if (System.currentTimeMillis() - at > 5 * 60_000L || isPassword) return
+        val ic = currentInputConnection ?: return
+        val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
+        ic.commitText((if (before.isNotEmpty() && !before[0].isWhitespace()) " " else "") + text, 1)
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -283,6 +295,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             if (prefs.gif) add(TopBarView.Tool.GIF)
             add(TopBarView.Tool.CLIPBOARD)
             if (prefs.ai) add(TopBarView.Tool.AI)
+            add(TopBarView.Tool.SCAN)
             add(TopBarView.Tool.SETTINGS)
             if (prefs.voice) add(TopBarView.Tool.MIC)
         }
@@ -855,9 +868,29 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     private fun insertPunctuation(p: String) {
         val ic = currentInputConnection ?: return
         if (composing.isNotEmpty()) finishWord(autocorrect = true)
+        if (p == "'") {
+            // "word |" + ' → "word'|": the apostrophe attaches to the word with no
+            // space, and the word stays open so "s", "t", "ll" … complete it.
+            val before = ic.getTextBeforeCursor(64, 0)?.toString().orEmpty()
+            val trimmed = before.trimEnd(' ')
+            val spaces = before.length - trimmed.length
+            val word = trimmed.takeLastWhile { it.isLetterOrDigit() || it == '\'' }
+            if (word.isNotEmpty() && spaces <= 1 && !noSuggestions) {
+                ic.deleteSurroundingText(word.length + spaces, 0)
+                composing.clear(); composing.append(word).append('\'')
+                ic.setComposingText(composing, 1)
+                prevWord = null
+            } else {
+                if (spaces == 1) ic.deleteSurroundingText(1, 0)
+                ic.commitText("'", 1)
+            }
+            phantomSpace = false; lastCorrection = null; lastGlide = null
+            refreshSuggestions()
+            return
+        }
         val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
-        if (before == " " && p != "'") ic.deleteSurroundingText(1, 0)
-        ic.commitText(if (p == "'" ) p else "$p ", 1)
+        if (before == " ") ic.deleteSurroundingText(1, 0)
+        ic.commitText("$p ", 1)
         phantomSpace = false
         lastCorrection = null
         lastGlide = null
@@ -892,6 +925,10 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             TopBarView.Tool.AI -> showAi()
             TopBarView.Tool.SETTINGS -> startActivity(Intent(this, SettingsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             TopBarView.Tool.MIC -> startVoice()
+            TopBarView.Tool.SCAN -> {
+                if (composing.isNotEmpty()) finishWord(autocorrect = true)
+                startActivity(Intent(this, ScanActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
         }
     }
 

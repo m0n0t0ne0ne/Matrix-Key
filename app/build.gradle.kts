@@ -13,8 +13,8 @@ android {
         applicationId = "com.matrixkey"
         minSdk = 29
         targetSdk = 34
-        versionCode = 20
-        versionName = "Update 19"
+        versionCode = 21
+        versionName = "Update 20"
     }
 
     // A fixed key committed to the repo, so every build can be installed as an
@@ -56,6 +56,8 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.preference:preference-ktx:1.2.1")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+    // On-device text recognition (Scan text). The model ships inside the app, works offline.
+    implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("com.google.android.material:material:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }
