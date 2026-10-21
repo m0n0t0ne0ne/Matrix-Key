@@ -62,6 +62,9 @@ class WordEngine(private val context: Context) {
             }
         }
         if (base.isEmpty()) FALLBACK.forEachIndexed { i, w -> base[w] = 20f - i * 0.01f }
+        // The bundled word list splits contractions ("don" + "t"), so add them
+        // back with realistic frequencies: don't, I'm, can't, you're …
+        CONTRACTION_LIST.forEach { (w, count) -> if (!base.containsKey(w)) base[w] = ln(count + 1f) }
         loadLearned()
         rebuildIndexes()
         ready = true
@@ -604,6 +607,16 @@ class WordEngine(private val context: Context) {
         /** A new word becomes a suggestion after you've typed it this many times. */
         const val LEARN_AFTER = 2
 
+        /** Common English contractions with approximate usage counts (same scale as the word list). */
+        private val CONTRACTION_LIST: List<Pair<String, Float>> = buildList {
+            fun group(count: Float, vararg ws: String) = ws.forEach { add(it to count) }
+            group(4_000_000f, "don't", "i'm", "it's", "you're", "that's", "i'll", "can't")
+            group(1_500_000f, "didn't", "i've", "what's", "he's", "we're", "let's", "there's", "won't", "doesn't", "isn't", "she's", "they're")
+            group(700_000f, "wasn't", "couldn't", "wouldn't", "you'll", "i'd", "we'll", "haven't", "aren't", "you've", "shouldn't", "he'll", "who's")
+            group(300_000f, "you'd", "they'll", "we've", "she'll", "hasn't", "weren't", "they've", "here's", "where's", "how's", "it'll", "that'll", "ain't", "o'clock", "ma'am")
+            group(100_000f, "he'd", "she'd", "we'd", "they'd", "it'd", "would've", "could've", "should've", "who'll", "what'll", "hadn't", "y'all", "there'll", "that'd", "who'd", "what're", "why's", "when's", "might've", "must've", "mustn't", "needn't", "everyone's", "nobody's", "somebody's", "someone's")
+        }
+
         private val I_WORDS = setOf("i", "i'm", "i've", "i'll", "i'd")
 
         /** Words that are also contractions: plain word → (contraction, previous words that mean the plain word). */
@@ -624,6 +637,8 @@ class WordEngine(private val context: Context) {
             "dont", "cant", "wont", "im", "ive", "thats", "whats", "youre", "theyre", "didnt", "doesnt", "isnt",
             "wasnt", "arent", "werent", "havent", "hasnt", "couldnt", "wouldnt", "shouldnt", "aint", "youve",
             "theyve", "weve", "youll", "theyll", "itll", "thatll", "wouldve", "couldve", "shouldve", "whos", "theres",
+            "doesnt", "hasnt", "hadnt", "heres", "wheres", "hows", "whats", "theyd", "youd", "hed", "mustnt",
+            "mightve", "mustve", "yall", "maam", "oclock", "hes", "shes", "itd", "thatd", "whod",
         )
 
         fun matchCase(typed: String, word: String): String = when {
