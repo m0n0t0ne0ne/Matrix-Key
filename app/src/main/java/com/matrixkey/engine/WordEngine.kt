@@ -181,6 +181,22 @@ class WordEngine(private val context: Context) {
             ?.takeIf { (userCounts[lower] ?: 0) == 0 }
         if (contraction != null) candidates[contraction] = (candidates.values.maxOrNull() ?: 0f) + 1f
 
+        // "ill" vs "I'll": decide from the previous word ("feel ill" / "ill call you").
+        // The other spelling always stays in the strip.
+        var ambiguousAuto: String? = null
+        AMBIGUOUS[lower]?.let { (contr, plainAfter) ->
+            val top = (candidates.values.maxOrNull() ?: 0f)
+            val wantPlain = prev?.lowercase()?.trim { !it.isLetter() } in plainAfter
+            if (wantPlain) {
+                candidates[lower] = top + 2f
+                candidates[contr] = top + 1f
+            } else {
+                candidates[contr] = top + 2f
+                candidates[lower] = top + 1f
+                if ((userCounts[lower] ?: 0) < 3) ambiguousAuto = contr
+            }
+        }
+
         val filtered = candidates.entries
             .filter { !hidden(it.key, blockOffensive) || it.key == lower }
             .sortedByDescending { it.value }
@@ -193,6 +209,7 @@ class WordEngine(private val context: Context) {
         // and the best candidate is clearly a correction, not just a longer completion.
         var auto: String? = null
         if (contraction != null && allowAutocorrect) auto = contraction
+        if (auto == null && allowAutocorrect && ambiguousAuto != null) auto = ambiguousAuto
         // "i" → "I"
         if (auto == null && allowAutocorrect && lower in I_WORDS && typed == lower) auto = lower
         if (auto == null && allowAutocorrect && lower.length >= 2) {
@@ -347,7 +364,8 @@ class WordEngine(private val context: Context) {
                 val lenPen = abs(ln((idealLen / kw + 0.5f) / (pathLen / kw + 0.5f)))
 
                 val score = -dtw * 6f - miss * 5f - extra * 4f - se * 2f - lenPen * 1.5f +
-                    freq(w) * 0.6f + bigramBoost(prev, w) * 0.8f + (if (habitsGlide[w] != null) 3f else 0f)
+                    freq(w) * 0.6f + bigramBoost(prev, w) * 0.8f + (if (habitsGlide[w] != null) 3f else 0f) +
+                    ambiguityBias(w, prev)
                 scored += w to score
             }
         }
@@ -358,6 +376,18 @@ class WordEngine(private val context: Context) {
             .distinct()
             .take(5)
             .toList()
+    }
+
+    /** Swipes for "ill"/"I'll" trace the same keys: let the previous word decide. */
+    private fun ambiguityBias(w: String, prev: String?): Float {
+        val p = prev?.lowercase()?.trim { !it.isLetter() }
+        for ((plain, pair) in AMBIGUOUS) {
+            val (contr, plainAfter) = pair
+            if (w != plain && w != contr) continue
+            val wantPlain = p in plainAfter
+            return if ((w == plain) == wantPlain) 6f else -6f
+        }
+        return 0f
     }
 
     /** Distance from a point to a polyline. */
@@ -575,6 +605,19 @@ class WordEngine(private val context: Context) {
         const val LEARN_AFTER = 2
 
         private val I_WORDS = setOf("i", "i'm", "i've", "i'll", "i'd")
+
+        /** Words that are also contractions: plain word → (contraction, previous words that mean the plain word). */
+        private val AMBIGUOUS: Map<String, Pair<String, Set<String>>> = mapOf(
+            "ill" to ("i'll" to setOf(
+                "is", "was", "am", "are", "were", "be", "been", "being", "feel", "feels", "felt", "feeling",
+                "get", "gets", "got", "getting", "gotten", "look", "looks", "looked", "looking", "seem", "seems",
+                "seemed", "become", "became", "fell", "falls", "fall", "so", "very", "really", "too", "quite",
+                "pretty", "kinda", "bit", "an", "the", "terminally", "critically", "mentally", "seriously",
+                "chronically", "gravely", "taken", "she's", "he's", "i'm", "you're", "they're", "we're", "it's",
+                "an", "of", "speak", "think", "spoke", "thought", "with", "no", "not", "never"
+            )),
+            "id" to ("i'd" to setOf("your", "my", "his", "her", "their", "our", "an", "the", "photo", "user", "valid", "student", "caller")),
+        )
 
         /** Real words that are almost always a missing apostrophe. */
         private val CONTRACTION_TYPOS = setOf(
