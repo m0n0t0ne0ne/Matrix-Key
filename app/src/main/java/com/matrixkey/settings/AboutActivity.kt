@@ -24,8 +24,8 @@ class AboutActivity : AppCompatActivity() {
 
     private val dp get() = resources.displayMetrics.density
     private fun px(v: Float) = (v * dp).toInt()
-    private val text get() = ContextCompat.getColor(this, R.color.mk_text)
-    private val sub get() = ContextCompat.getColor(this, R.color.mk_sub)
+    private val textColor get() = ContextCompat.getColor(this, R.color.mk_text)
+    private val subColor get() = ContextCompat.getColor(this, R.color.mk_sub)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,7 +67,7 @@ class AboutActivity : AppCompatActivity() {
         ))
         col.addView(TextView(this).apply {
             text = "Unofficial app, not affiliated with Nothing."
-            setTextColor(sub); textSize = 13f
+            setTextColor(subColor); textSize = 13f
             setPadding(px(8f), px(20f), px(8f), 0)
         })
 
@@ -79,7 +79,7 @@ class AboutActivity : AppCompatActivity() {
 
     private fun sectionTitle(s: String) = TextView(this).apply {
         text = s
-        setTextColor(sub)
+        setTextColor(subColor)
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
         setPadding(px(8f), px(24f), 0, px(8f))
     }
@@ -97,13 +97,13 @@ class AboutActivity : AppCompatActivity() {
     private fun row(title: String, value: String) = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(px(16f), px(12f), px(16f), px(12f))
-        addView(TextView(context).apply { text = title; setTextColor(text); setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f) })
-        addView(TextView(context).apply { text = value; setTextColor(sub); setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f) })
+        addView(TextView(context).apply { text = title; setTextColor(textColor); setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f) })
+        addView(TextView(context).apply { text = value; setTextColor(subColor); setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f) })
     }
 
     private fun note(s: String) = TextView(this).apply {
         text = s
-        setTextColor(text)
+        setTextColor(textColor)
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
         setLineSpacing(0f, 1.15f)
         setPadding(px(16f), px(12f), px(16f), px(12f))
