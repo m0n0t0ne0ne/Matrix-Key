@@ -116,6 +116,9 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     // Field flags
     private var noLearning = false
     private var noSuggestions = false
+    /** Fields that ask for no suggestions (many apps set this just to hide spell-check underlines):
+     *  suggestions and next-word predictions still show, but nothing is changed automatically. */
+    private var noAutocorrect = false
     /** The strip is showing personal-dictionary matches for the text before the cursor. */
     private var tokenSuggestions = false
 
@@ -348,8 +351,8 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             (cls == InputType.TYPE_CLASS_NUMBER && variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD)
         noSuggestions = isPassword || cls != InputType.TYPE_CLASS_TEXT ||
             variation == InputType.TYPE_TEXT_VARIATION_URI || variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
-            variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS ||
-            (info.inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) != 0
+            variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS
+        noAutocorrect = noSuggestions || (info.inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) != 0
         val incognitoField = (info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
         noLearning = isPassword || !prefs.learn || (prefs.incognito && incognitoField)
     }
@@ -575,7 +578,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         val typed = composing.toString()
         if (typed.isEmpty()) return
         val correction = autoCorrection
-        val final = if (autocorrect && prefs.autocorrect && !noSuggestions && correction != null &&
+        val final = if (autocorrect && prefs.autocorrect && !noAutocorrect && correction != null &&
             !correction.equals(typed, ignoreCase = false) && engine.ready
         ) correction else typed
         ic.commitText(final, 1)
@@ -862,7 +865,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             return
         }
         val prev = prevWord
-        val allowAuto = prefs.autocorrect
+        val allowAuto = prefs.autocorrect && !noAutocorrect
         val block = prefs.blockOffensive
         val predict = prefs.nextWord
         engineHandler.post {

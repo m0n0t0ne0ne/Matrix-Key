@@ -49,25 +49,41 @@ class Feedback(context: Context) {
     private val hasAmplitude: Boolean by lazy { vibrator?.hasAmplitudeControl() == true }
 
     /**
-     * Key press. The strength slider maps to both how long and how hard the
-     * motor runs (8–28 ms, amplitude 90–255), so the top of the slider is a
-     * firm, clearly felt click on Nothing's motor.
+     * Key press, scaled by the strength slider so every step is felt:
+     *  - lower 60%: the motor's crisp click effect, from a faint tap to a full click;
+     *  - upper 40%: a full-power pulse that gets longer (14–40 ms), for a firm thump.
+     * Phones without click effects get a pulse whose power and length both scale.
      */
     private fun click(view: View) {
         val v = vibrator
-        val s = (strength / 100f).coerceIn(0f, 1f)
-        if (v != null && v.hasVibrator()) {
-            val ms = (8 + 20 * s).toLong()
-            val amp = if (hasAmplitude) (90 + 165 * s).toInt().coerceIn(1, 255) else VibrationEffect.DEFAULT_AMPLITUDE
-            if (s < 0.25f && supportsPrimitives && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                // Very light settings: the motor's own crisp click primitive.
-                v.vibrate(VibrationEffect.startComposition().addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, (0.4f + s * 2.4f).coerceAtMost(1f)).compose())
-            } else {
-                v.vibrate(VibrationEffect.createOneShot(ms, amp))
-            }
-        } else {
+        if (v == null || !v.hasVibrator()) {
             view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+            return
         }
+        vibrateAt(v, (strength / 100f).coerceIn(0f, 1f))
+    }
+
+    private fun vibrateAt(v: Vibrator, s: Float) {
+        if (s <= 0f) return
+        if (supportsPrimitives && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && s <= 0.6f) {
+            val scale = (0.12f + s / 0.6f * 0.88f).coerceIn(0.05f, 1f)
+            v.vibrate(VibrationEffect.startComposition().addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, scale).compose())
+            return
+        }
+        val (ms, amp) = if (supportsPrimitives) {
+            val t = ((s - 0.6f) / 0.4f).coerceIn(0f, 1f)
+            (14 + 26 * t).toLong() to 255
+        } else {
+            (6 + 34 * s).toLong() to (30 + 225 * s).toInt().coerceIn(1, 255)
+        }
+        v.vibrate(VibrationEffect.createOneShot(ms, if (hasAmplitude) amp else VibrationEffect.DEFAULT_AMPLITUDE))
+    }
+
+    /** Plays one key press at [strengthPercent] (0–100), for the settings slider preview. */
+    fun preview(view: View, strengthPercent: Int) {
+        val v = vibrator
+        if (v == null || !v.hasVibrator()) { view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); return }
+        vibrateAt(v, (strengthPercent / 100f).coerceIn(0f, 1f))
     }
 
     /**

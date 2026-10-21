@@ -31,6 +31,22 @@ class PrefsFragment : PreferenceFragmentCompat() {
         val name = arguments?.getString("xml") ?: "prefs_main"
         val res = resources.getIdentifier(name, "xml", requireContext().packageName)
         setPreferencesFromResource(res, rootKey)
+        // Vibration strength: feel each strength as you slide.
+        findPreference<androidx.preference.SeekBarPreference>("vibration_strength")?.let { bar ->
+            bar.updatesContinuously = true
+            val haptics = com.matrixkey.keyboard.Feedback(requireContext())
+            var last = 0L
+            var lastValue = -1
+            bar.setOnPreferenceChangeListener { _, value ->
+                val n = value as Int
+                val now = android.os.SystemClock.uptimeMillis()
+                if (n != lastValue && now - last > 70) {
+                    last = now; lastValue = n
+                    view?.let { haptics.preview(it, n) }
+                }
+                true
+            }
+        }
         findPreference<Preference>("about")?.setOnPreferenceClickListener {
             startActivity(Intent(requireContext(), AboutActivity::class.java)); true
         }
