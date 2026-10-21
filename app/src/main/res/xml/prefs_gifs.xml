@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-    <PreferenceCategory android:title="GIF search" app:iconSpaceReserved="false">
+    <com.matrixkey.settings.DotCategory android:title="GIF search" app:iconSpaceReserved="false">
         <SwitchPreferenceCompat
             android:key="gif"
             android:title="GIF button"
@@ -41,5 +41,5 @@
             android:summary="Paste the link when an app can't take GIFs"
             android:defaultValue="true"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
+    </com.matrixkey.settings.DotCategory>
 </PreferenceScreen>

@@ -80,7 +80,7 @@ class ThemeActivity : AppCompatActivity() {
         prefs = Prefs(this)
         themeId = prefs.theme; keyShape = prefs.keyShape; keyFont = prefs.keyFont; accent = prefs.accent
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        title = "Theme"
+        title = com.matrixkey.settings.dotTitle(this, "Theme")
 
         val scroll = ScrollView(this)
         val col = LinearLayout(this).apply {
@@ -118,22 +118,32 @@ class ThemeActivity : AppCompatActivity() {
             setPadding(px(4f), px(6f), 0, 0)
         })
 
-        // Key shape dropdown
+        // Key shape, key font and accent live in one rounded card.
+        col.addView(header("Keys"))
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(px(18f), px(6f), px(18f), px(14f))
+            background = GradientDrawable().apply {
+                cornerRadius = 20 * dp
+                setColor(androidx.core.content.ContextCompat.getColor(this@ThemeActivity, com.matrixkey.R.color.mk_card))
+            }
+        }
+        col.addView(card)
+
         shapeButton = Button(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle)
+        shapeButton.setTextColor(textColor)
         shapeButton.setOnClickListener { showShapeMenu() }
-        col.addView(settingRow("Key shape", shapeButton))
+        card.addView(settingRow("Key shape", shapeButton))
 
-        // Key font
-        fontRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        col.addView(TextView(this).apply {
+        fontRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, px(2f), 0, px(6f)) }
+        card.addView(TextView(this).apply {
             text = "Key font"; setTextColor(textColor); setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-            setPadding(0, px(14f), 0, px(8f))
+            setPadding(0, px(10f), 0, px(10f))
         })
-        col.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(fontRow) })
+        card.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; clipToPadding = false; addView(fontRow) })
 
-        // Accent
         accentRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        col.addView(settingRow("Accent", accentRow))
+        card.addView(settingRow("Accent", accentRow))
 
         // Cancel / Apply
         val buttons = LinearLayout(this).apply {
@@ -165,10 +175,12 @@ class ThemeActivity : AppCompatActivity() {
     // ------------------------------------------------------------------
 
     private fun header(s: String) = TextView(this).apply {
-        text = s
-        setTextColor(primary)
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-        setPadding(px(4f), px(18f), 0, px(10f))
+        text = s.uppercase()
+        typeface = FontManager.ndot(this@ThemeActivity)
+        letterSpacing = 0.08f
+        setTextColor(subColor)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        setPadding(px(4f), px(22f), 0, px(10f))
     }
 
     private fun settingRow(label: String, control: View): View {
@@ -233,10 +245,13 @@ class ThemeActivity : AppCompatActivity() {
         gravity = Gravity.CENTER
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
         setTextColor(if (selected) MaterialColors.getColor(this@ThemeActivity, com.google.android.material.R.attr.colorOnPrimary, Color.WHITE) else textColor)
-        setPadding(px(14f), 0, px(14f), 0)
+        // Vertical padding + wrap-content height so tall dot-matrix glyphs never clip.
+        setPadding(px(16f), px(10f), px(16f), px(10f))
+        includeFontPadding = true
         minWidth = px(64f)
+        minHeight = px(44f)
         background = GradientDrawable().apply {
-            cornerRadius = 20 * dp
+            cornerRadius = 22 * dp
             if (selected) setColor(primary) else { setColor(Color.TRANSPARENT); setStroke(px(1.5f), outline) }
         }
         setOnClickListener { onClick() }
@@ -264,7 +279,7 @@ class ThemeActivity : AppCompatActivity() {
             }
             if (id != "custom") c.typeface = FontManager.keyTypeface(this, id)
             if (id == "custom" && hasCustom) c.setOnLongClickListener { pickFont(); true }
-            fontRow.addView(c, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(44f)).apply {
+            fontRow.addView(c, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                 if (i > 0) marginStart = px(8f)
             })
         }

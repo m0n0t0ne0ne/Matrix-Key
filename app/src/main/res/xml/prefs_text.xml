@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-    <PreferenceCategory android:title="Suggestions" app:iconSpaceReserved="false">
+    <com.matrixkey.settings.DotCategory android:title="Suggestions" app:iconSpaceReserved="false">
         <SwitchPreferenceCompat
             android:key="show_suggestions"
             android:title="Show suggestion strip"
@@ -23,8 +23,8 @@
             android:title="Block offensive words"
             android:defaultValue="true"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
-    <PreferenceCategory android:title="Corrections" app:iconSpaceReserved="false">
+    </com.matrixkey.settings.DotCategory>
+    <com.matrixkey.settings.DotCategory android:title="Corrections" app:iconSpaceReserved="false">
         <SwitchPreferenceCompat
             android:key="autocorrect"
             android:title="Auto-correction"
@@ -53,5 +53,5 @@
             android:title="Double-space period"
             android:defaultValue="true"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
+    </com.matrixkey.settings.DotCategory>
 </PreferenceScreen>

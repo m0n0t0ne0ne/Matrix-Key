@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-    <PreferenceCategory android:title="Provider" app:iconSpaceReserved="false">
+    <com.matrixkey.settings.DotCategory android:title="Provider" app:iconSpaceReserved="false">
         <SwitchPreferenceCompat
             android:key="ai"
             android:title="AI writing tools"
@@ -45,8 +45,8 @@
             android:defaultValue="llama-3.3-70b-versatile"
             app:useSimpleSummaryProvider="true"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
-    <PreferenceCategory android:title="Safety" app:iconSpaceReserved="false">
+    </com.matrixkey.settings.DotCategory>
+    <com.matrixkey.settings.DotCategory android:title="Safety" app:iconSpaceReserved="false">
         <Preference
             android:title="Never in password fields"
             android:summary="Always on"
@@ -57,5 +57,5 @@
             android:summary="Nothing is sent automatically. On the free tiers, providers may use what you send to improve their models."
             android:selectable="false"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
+    </com.matrixkey.settings.DotCategory>
 </PreferenceScreen>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-    <PreferenceCategory android:title="Your data" app:iconSpaceReserved="false">
+    <com.matrixkey.settings.DotCategory android:title="Your data" app:iconSpaceReserved="false">
         <SwitchPreferenceCompat
             android:key="incognito"
             android:title="Incognito in private tabs"
@@ -28,5 +28,5 @@
             android:title="Delete all keyboard data"
             android:summary="Dictionary, clipboard history, themes and settings"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
+    </com.matrixkey.settings.DotCategory>
 </PreferenceScreen>

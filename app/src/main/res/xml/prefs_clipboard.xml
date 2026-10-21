@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-    <PreferenceCategory android:title="History" app:iconSpaceReserved="false">
+    <com.matrixkey.settings.DotCategory android:title="History" app:iconSpaceReserved="false">
         <SwitchPreferenceCompat
             android:key="clipboard"
             android:title="Clipboard history"
@@ -27,5 +27,5 @@
             android:summary="Long-press an item in the clipboard panel to pin it. Pinned items never clear."
             android:selectable="false"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
+    </com.matrixkey.settings.DotCategory>
 </PreferenceScreen>

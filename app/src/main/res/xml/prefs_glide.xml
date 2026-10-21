@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-    <PreferenceCategory android:title="Glide" app:iconSpaceReserved="false">
+    <com.matrixkey.settings.DotCategory android:title="Glide" app:iconSpaceReserved="false">
         <SwitchPreferenceCompat
             android:key="glide"
             android:title="Enable glide typing"
@@ -36,8 +36,8 @@
             android:entryValues="@array/trail_color_values"
             app:useSimpleSummaryProvider="true"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
-    <PreferenceCategory android:title="Gestures" app:iconSpaceReserved="false">
+    </com.matrixkey.settings.DotCategory>
+    <com.matrixkey.settings.DotCategory android:title="Gestures" app:iconSpaceReserved="false">
         <SwitchPreferenceCompat
             android:key="gesture_delete"
             android:title="Gesture delete"
@@ -56,5 +56,5 @@
             android:summary="A light tap for each letter you pass"
             android:defaultValue="true"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
+    </com.matrixkey.settings.DotCategory>
 </PreferenceScreen>

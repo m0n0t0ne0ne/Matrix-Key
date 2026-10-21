@@ -34,7 +34,7 @@ class SettingsActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPrefere
 
     private fun updateTitle() {
         val f = supportFragmentManager.findFragmentById(containerId) as? PrefsFragment
-        title = f?.arguments?.getString("title") ?: "Matrix Key"
+        title = dotTitle(this, f?.arguments?.getString("title") ?: "Matrix Key")
         supportActionBar?.setDisplayHomeAsUpEnabled(supportFragmentManager.backStackEntryCount > 0)
     }
 

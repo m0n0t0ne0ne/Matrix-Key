@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="mk_bg">#000000</color>
+    <color name="mk_card">#141414</color>
+    <color name="mk_text">#F2F2F2</color>
+    <color name="mk_sub">#9A9A9A</color>
+    <color name="mk_line">#2A2A2A</color>
+    <color name="mk_primary">#F2F2F2</color>
+    <color name="mk_on_primary">#000000</color>
+    <color name="mk_track_off">#2E2E2E</color>
+    <color name="mk_red">#E5333B</color>
+</resources>

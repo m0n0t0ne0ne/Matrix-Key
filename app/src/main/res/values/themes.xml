@@ -1,7 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.MatrixKey" parent="Theme.Material3.DynamicColors.DayNight">
-        <item name="android:statusBarColor">@android:color/transparent</item>
+    <style name="Theme.MatrixKey" parent="Theme.Material3.DayNight">
+        <item name="colorPrimary">@color/mk_primary</item>
+        <item name="colorOnPrimary">@color/mk_on_primary</item>
+        <item name="colorPrimaryContainer">@color/mk_card</item>
+        <item name="colorOnPrimaryContainer">@color/mk_text</item>
+        <item name="colorSecondary">@color/mk_primary</item>
+        <item name="colorOnSecondary">@color/mk_on_primary</item>
+        <item name="colorSecondaryContainer">@color/mk_line</item>
+        <item name="colorTertiary">@color/mk_red</item>
+        <item name="colorSurface">@color/mk_bg</item>
+        <item name="colorOnSurface">@color/mk_text</item>
+        <item name="colorOnSurfaceVariant">@color/mk_sub</item>
+        <item name="colorSurfaceContainerHigh">@color/mk_card</item>
+        <item name="colorSurfaceContainerHighest">@color/mk_track_off</item>
+        <item name="colorOutline">@color/mk_sub</item>
+        <item name="colorOutlineVariant">@color/mk_line</item>
+        <item name="android:colorBackground">@color/mk_bg</item>
+        <item name="android:windowBackground">@color/mk_bg</item>
+        <item name="android:statusBarColor">@color/mk_bg</item>
+        <item name="android:navigationBarColor">@color/mk_bg</item>
+        <item name="android:windowLightStatusBar">@bool/mk_light_bars</item>
+        <item name="android:windowLightNavigationBar">@bool/mk_light_bars</item>
+        <item name="colorControlActivated">@color/mk_primary</item>
+        <item name="android:textColorPrimary">@color/mk_text</item>
+        <item name="android:textColorSecondary">@color/mk_sub</item>
+        <item name="actionBarStyle">@style/MatrixKey.ActionBar</item>
+        <item name="preferenceTheme">@style/MatrixKey.PreferenceTheme</item>
+    </style>
+
+    <style name="MatrixKey.ActionBar" parent="Widget.Material3.ActionBar.Solid">
+        <item name="background">@color/mk_bg</item>
+        <item name="elevation">0dp</item>
+    </style>
+
+    <style name="MatrixKey.PreferenceTheme" parent="@style/PreferenceThemeOverlay">
+        <item name="switchPreferenceCompatStyle">@style/MatrixKey.Switch</item>
+    </style>
+
+    <style name="MatrixKey.Switch" parent="@style/Preference.SwitchPreferenceCompat.Material">
+        <item name="android:widgetLayout">@layout/mk_switch</item>
     </style>
 
     <style name="Theme.MatrixKey.Transparent" parent="Theme.MatrixKey">

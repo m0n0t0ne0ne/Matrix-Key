@@ -41,7 +41,7 @@ class DictionaryActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        title = "Dictionary"
+        title = dotTitle(this, "Dictionary")
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         engine = WordEngine(this)
 

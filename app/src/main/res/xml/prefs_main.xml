@@ -2,7 +2,7 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <PreferenceCategory
+    <com.matrixkey.settings.DotCategory
         android:key="setup"
         android:title="Set up"
         app:iconSpaceReserved="false">
@@ -21,9 +21,9 @@
             android:title="3. Allow the microphone"
             android:summary="Needed for voice typing"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
+    </com.matrixkey.settings.DotCategory>
 
-    <PreferenceCategory
+    <com.matrixkey.settings.DotCategory
         android:title="Settings"
         app:iconSpaceReserved="false">
         <Preference
@@ -122,5 +122,5 @@
             android:summary="Matrix Key · Doto font (SIL OFL) · FrequencyWords (CC BY-SA 4.0)"
             android:selectable="false"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
+    </com.matrixkey.settings.DotCategory>
 </PreferenceScreen>

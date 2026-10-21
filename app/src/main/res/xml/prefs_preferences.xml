@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-    <PreferenceCategory android:title="Keys" app:iconSpaceReserved="false">
+    <com.matrixkey.settings.DotCategory android:title="Keys" app:iconSpaceReserved="false">
         <SwitchPreferenceCompat
             android:key="number_row"
             android:title="Number row"
@@ -32,8 +32,8 @@
             android:summary="Show tools when there are no suggestions"
             android:defaultValue="true"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
-    <PreferenceCategory android:title="Layout" app:iconSpaceReserved="false">
+    </com.matrixkey.settings.DotCategory>
+    <com.matrixkey.settings.DotCategory android:title="Layout" app:iconSpaceReserved="false">
         <ListPreference
             android:key="one_handed"
             android:title="One-handed mode"
@@ -58,8 +58,8 @@
             android:entryValues="@array/height_values"
             app:useSimpleSummaryProvider="true"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
-    <PreferenceCategory android:title="Key press" app:iconSpaceReserved="false">
+    </com.matrixkey.settings.DotCategory>
+    <com.matrixkey.settings.DotCategory android:title="Key press" app:iconSpaceReserved="false">
         <SwitchPreferenceCompat
             android:key="sound"
             android:title="Sound on keypress"
@@ -98,5 +98,5 @@
             android:entryValues="@array/delay_values"
             app:useSimpleSummaryProvider="true"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
+    </com.matrixkey.settings.DotCategory>
 </PreferenceScreen>

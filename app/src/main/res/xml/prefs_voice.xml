@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-    <PreferenceCategory android:title="Voice" app:iconSpaceReserved="false">
+    <com.matrixkey.settings.DotCategory android:title="Voice" app:iconSpaceReserved="false">
         <SwitchPreferenceCompat
             android:key="voice"
             android:title="Use voice typing"
@@ -27,5 +27,5 @@
             android:title="Microphone permission"
             android:summary="Tap to allow"
             app:iconSpaceReserved="false" />
-    </PreferenceCategory>
+    </com.matrixkey.settings.DotCategory>
 </PreferenceScreen>

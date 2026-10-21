@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings app: monochrome, with Nothing red used sparingly. -->
+    <color name="mk_bg">#F2F2F2</color>
+    <color name="mk_card">#FFFFFF</color>
+    <color name="mk_text">#111111</color>
+    <color name="mk_sub">#6B6B6B</color>
+    <color name="mk_line">#DADADA</color>
+    <color name="mk_primary">#111111</color>
+    <color name="mk_on_primary">#FFFFFF</color>
+    <color name="mk_track_off">#DADADA</color>
+    <color name="mk_red">#D71921</color>
+</resources>

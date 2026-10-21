@@ -70,6 +70,29 @@ class PrefsFragment : PreferenceFragmentCompat() {
         }
     }
 
+    override fun onViewCreated(view: android.view.View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        listView.addItemDecoration(CardDecoration(requireContext()) { pos -> flatHeaders().getOrElse(pos) { true } })
+        listView.clipToPadding = false
+        listView.setPadding(0, 0, 0, (32 * resources.displayMetrics.density).toInt())
+        setDivider(null)
+    }
+
+    /** Visible rows in adapter order: true where the row is a section header. */
+    private fun flatHeaders(): List<Boolean> {
+        val out = ArrayList<Boolean>()
+        fun walk(g: androidx.preference.PreferenceGroup) {
+            for (i in 0 until g.preferenceCount) {
+                val p = g.getPreference(i)
+                if (!p.isVisible) continue
+                out += p is androidx.preference.PreferenceCategory
+                if (p is androidx.preference.PreferenceCategory) walk(p)
+            }
+        }
+        preferenceScreen?.let { walk(it) }
+        return out
+    }
+
     override fun onResume() {
         super.onResume()
         updateSetupState()
