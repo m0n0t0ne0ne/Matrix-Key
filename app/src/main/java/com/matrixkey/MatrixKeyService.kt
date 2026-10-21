@@ -715,8 +715,10 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         val typed = composing.toString()
         val gen = ++suggestionGen
         if (!prefs.showSuggestions || noSuggestions) {
+            // No word suggestions here (the app asked for none, e.g. Google Keep notes,
+            // or they're turned off), but punctuation is still offered after a word.
             autoCorrection = null
-            currentSuggestions = emptyList()
+            currentSuggestions = if (!isPassword && typed.isEmpty() && afterWord()) PUNCTUATION else emptyList()
             showToolbarOrSuggestions()
             return
         }
