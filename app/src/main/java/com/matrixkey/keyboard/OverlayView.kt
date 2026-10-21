@@ -11,6 +11,7 @@ import android.view.View
 import androidx.core.graphics.ColorUtils
 import kotlin.math.hypot
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.pow
 
 /**
@@ -56,6 +57,7 @@ class OverlayView(context: Context) : View(context) {
         strokeJoin = Paint.Join.ROUND
     }
     private val fadeMs = 260L
+    private val trailPath = android.graphics.Path()
 
     fun showPopup(rect: RectF, label: String, bg: Int, fg: Int) {
         popupKeyRect = RectF(rect); popupLabel = label; popupBg = bg; popupText = fg
@@ -176,7 +178,7 @@ class OverlayView(context: Context) : View(context) {
 
         if (trailDotted) {
             // Dots evenly spaced along the path, growing and brightening toward the finger.
-            val spacing = base * 1.7f
+            val spacing = max(base * 1.6f, 5f * dp)
             fill.style = Paint.Style.FILL
             var carry = 0f
             for (i in 1 until total) {
@@ -197,13 +199,36 @@ class OverlayView(context: Context) : View(context) {
                 carry = seg - (d - spacing)
             }
         } else {
-            for (i in 1 until total) {
-                val a = trail[i - 1]; val b = trail[i]
-                val prog = i.toFloat() / max(1, total - 1)
-                trailPaint.strokeWidth = base * (0.35f + 0.65f * prog)
-                trailPaint.color = ColorUtils.setAlphaComponent(trailColor, ((0.1f + 0.9f * prog) * endFade * 255).toInt().coerceIn(0, 255))
-                canvas.drawLine(a.x, a.y, b.x, b.y, trailPaint)
+            // One smooth curve through the points (midpoint quadratic smoothing),
+            // drawn opaque in a few tapering pieces on a faded layer, so fast
+            // swipes stay a continuous line instead of beads.
+            val layerAlpha = (endFade * 235).toInt().coerceIn(0, 255)
+            val save = canvas.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), layerAlpha)
+            trailPaint.color = ColorUtils.setAlphaComponent(trailColor, 255)
+            val chunks = min(12, total - 1)
+            var sx = trail[0].x; var sy = trail[0].y
+            for (c in 0 until chunks) {
+                val from = 1 + c * (total - 1) / chunks
+                val to = 1 + (c + 1) * (total - 1) / chunks
+                trailPath.reset()
+                trailPath.moveTo(sx, sy)
+                for (i in from until to) {
+                    val p = trail[i]
+                    if (i < total - 1) {
+                        val q = trail[i + 1]
+                        val mx = (p.x + q.x) / 2f; val my = (p.y + q.y) / 2f
+                        trailPath.quadTo(p.x, p.y, mx, my)
+                        sx = mx; sy = my
+                    } else {
+                        trailPath.lineTo(p.x, p.y)
+                        sx = p.x; sy = p.y
+                    }
+                }
+                val prog = (c + 1).toFloat() / chunks
+                trailPaint.strokeWidth = base * (0.3f + 0.7f * prog)
+                canvas.drawPath(trailPath, trailPaint)
             }
+            canvas.restoreToCount(save)
         }
         if (trail.isNotEmpty()) postInvalidateOnAnimation()
     }

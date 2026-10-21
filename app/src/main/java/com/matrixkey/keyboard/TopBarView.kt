@@ -55,6 +55,7 @@ class TopBarView(context: Context) : View(context) {
 
     private val dp = resources.displayMetrics.density
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val text = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val leftText = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.LEFT }
 
@@ -160,30 +161,37 @@ class TopBarView(context: Context) : View(context) {
     private fun drawSearch(canvas: Canvas) {
         val t = theme
         roundButton(canvas, leftBtn, Icon.CLOSE, t.chip, t.text)
+        // The box is outlined in the accent color so it's clearly the field
+        // being typed into (Android doesn't let a keyboard hide the app's own cursor).
         fill.color = t.key
         canvas.drawRoundRect(searchBox, searchBox.height() / 2, searchBox.height() / 2, fill)
+        outline.color = t.accent
+        outline.strokeWidth = 2 * dp
+        val r = RectF(searchBox).apply { inset(dp, dp) }
+        canvas.drawRoundRect(r, r.height() / 2, r.height() / 2, outline)
         leftText.typeface = Typeface.DEFAULT
         leftText.textSize = 16 * resources.displayMetrics.scaledDensity
         val pad = 16 * dp
         val avail = searchBox.width() - pad * 2
         val fm = leftText.fontMetrics
         val baseline = searchBox.centerY() - (fm.ascent + fm.descent) / 2
+        var cursorX = searchBox.left + pad
         if (searchText.isEmpty()) {
             leftText.color = t.sub
-            canvas.drawText(TextUtils.ellipsize(searchHint, leftText, avail, TextUtils.TruncateAt.END).toString(), searchBox.left + pad, baseline, leftText)
+            canvas.drawText(TextUtils.ellipsize(searchHint, leftText, avail, TextUtils.TruncateAt.END).toString(), searchBox.left + pad + 4 * dp, baseline, leftText)
         } else {
             leftText.color = t.text
             // Keep the end of the text (where you're typing) visible.
             var shown = searchText
             while (leftText.measureText(shown) > avail - 4 * dp && shown.length > 1) shown = shown.substring(1)
             canvas.drawText(shown, searchBox.left + pad, baseline, leftText)
-            val cursorX = searchBox.left + pad + leftText.measureText(shown) + 2 * dp
-            if ((SystemClock.uptimeMillis() / 530) % 2 == 0L) {
-                fill.color = t.accent
-                canvas.drawRect(cursorX, searchBox.top + 12 * dp, cursorX + 2 * dp, searchBox.bottom - 12 * dp, fill)
-            }
-            postInvalidateDelayed(530)
+            cursorX += leftText.measureText(shown) + 2 * dp
         }
+        if ((SystemClock.uptimeMillis() / 530) % 2 == 0L) {
+            fill.color = t.accent
+            canvas.drawRect(cursorX, searchBox.top + 12 * dp, cursorX + 2 * dp, searchBox.bottom - 12 * dp, fill)
+        }
+        postInvalidateDelayed(530)
         roundButton(canvas, rightBtn, searchIcon, t.accent, t.onAccent)
     }
 

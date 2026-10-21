@@ -268,7 +268,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             else -> theme.trail ?: theme.accent
         }
         overlay.trailDotted = when (prefs.trailStyle) { "dot" -> true; "solid" -> false; else -> dot }
-        overlay.trailWidthDp = when (prefs.trailWidth) { "thin" -> 4f; "thick" -> 9f; else -> 6f }
+        overlay.trailWidthDp = when (prefs.trailWidth) { "thin" -> 3f; "thick" -> 11f; else -> 6.5f }
 
         topBar.theme = theme
         topBar.typeface = tf
@@ -551,6 +551,21 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     }
 
     override fun onGlide(path: List<PointF>) {
+        if (target != Target.NONE) {
+            // Swiping inside the GIF search / AI prompt box types into that box.
+            engineHandler.post {
+                val words = engine.decodeGlide(path, null, prefs.blockOffensive)
+                main.post {
+                    val w = words.firstOrNull() ?: return@post
+                    if (target == Target.NONE) return@post
+                    if (targetText.isNotEmpty() && !targetText.endsWith(" ")) targetText.append(' ')
+                    targetText.append(if (shift != ShiftState.OFF) w.replaceFirstChar { it.uppercase() } else w)
+                    topBar.searchText = targetText.toString()
+                    if (shift == ShiftState.ON) setShift(ShiftState.OFF)
+                }
+            }
+            return
+        }
         val ic = currentInputConnection ?: return
         if (composing.isNotEmpty()) finishWord(autocorrect = false)
         val prev = prevWord
