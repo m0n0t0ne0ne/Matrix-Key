@@ -32,6 +32,7 @@ class GifPanel(
     private val main = Handler(Looper.getMainLooper())
     private val searchPill = TextView(context)
     private val status = ui.text("", 14f, ui.theme.sub)
+    private val attribution = ui.text("", 11f, ui.theme.sub)
     private val columns = ui.row()
     private val left = ui.column()
     private val right = ui.column()
@@ -55,7 +56,7 @@ class GifPanel(
         header.addView(searchPill, LayoutParams(0, ui.px(40f), 1f))
         addView(header, LayoutParams(LayoutParams.MATCH_PARENT, ui.px(48f)))
 
-        val attribution = ui.text(client.attribution, 11f, ui.theme.sub).apply { gravity = Gravity.END }
+        attribution.gravity = Gravity.END
         addView(attribution, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, ui.px(6f), ui.px(2f)) })
 
         status.gravity = Gravity.CENTER
@@ -70,6 +71,7 @@ class GifPanel(
     }
 
     fun search(query: String) {
+        attribution.text = client.attribution
         searchPill.text = query.ifBlank { "Search ${client.providerName}" }
         searchPill.setTextColor(if (query.isBlank()) ui.theme.sub else ui.theme.text)
         status.text = if (query.isBlank()) "Trending" else "Searching…"
@@ -87,7 +89,12 @@ class GifPanel(
                     status.visibility = VISIBLE
                     status.text = when (e) {
                         is GifClient.MissingKey -> e.message
-                        is Http.HttpError -> if (e.code == 429) "Hourly GIF limit reached. Try again later." else "GIF service error (${e.code}). Check your API key."
+                        is Http.HttpError -> when (e.code) {
+                            429 -> "Hourly GIF limit reached. Try again later."
+                            401, 403, 404 -> "${client.providerName} rejected the API key (${e.code}). Check the key in Settings › GIFs." +
+                                GifClient.serverMessage(e.body)
+                            else -> "${client.providerName} error (${e.code})." + GifClient.serverMessage(e.body)
+                        }
                         else -> "Couldn't load GIFs. Check your connection."
                     }
                 }

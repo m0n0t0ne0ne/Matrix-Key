@@ -68,13 +68,18 @@ class GifClient(private val context: Context, private val prefs: Prefs) {
     }
 
     private fun klipy(query: String): List<Gif> {
-        val key = prefs.klipyKey.ifEmpty { throw MissingKey("KLIPY") }
-        val filter = when (prefs.gifRating) { "g" -> "high"; "r" -> "off"; else -> "medium" }
-        val rating = prefs.gifRating
+        val key = prefs.klipyKey.replace(Regex("\\s"), "").ifEmpty { throw MissingKey("KLIPY") }
         val base = "https://api.klipy.com/api/v1/${enc(key)}/gifs"
-        val common = "per_page=30&page=1&customer_id=${enc(customerId)}&locale=en_US&content_filter=$filter&rating=${enc(rating)}"
+        // Keep to the parameters KLIPY documents; extra ones can make it reject the call.
+        val common = "per_page=30&page=1&customer_id=${enc(customerId)}"
         val url = if (query.isBlank()) "$base/trending?$common" else "$base/search?q=${enc(query)}&$common"
-        val root = JSONObject(Http.get(url))
+        val body = try {
+            Http.get(url)
+        } catch (e: Http.HttpError) {
+            // Some keys don't have trending enabled: fall back to a search.
+            if (query.isBlank() && e.code == 404) Http.get("$base/search?q=${enc("trending")}&$common") else throw e
+        }
+        val root = JSONObject(body)
         val outer = root.optJSONObject("data")
         val items: JSONArray = outer?.optJSONArray("data") ?: root.optJSONArray("data") ?: return emptyList()
         val out = ArrayList<Gif>()
@@ -96,6 +101,19 @@ class GifClient(private val context: Context, private val prefs: Prefs) {
             )
         }
         return out
+    }
+
+    companion object {
+        /** A short human-readable message from an API error body, if it has one. */
+        fun serverMessage(body: String): String {
+            val msg = runCatching {
+                val o = JSONObject(body)
+                o.optString("message").ifEmpty { o.optJSONObject("error")?.optString("message").orEmpty() }
+                    .ifEmpty { o.optJSONObject("meta")?.optString("msg").orEmpty() }
+                    .ifEmpty { o.optJSONArray("errors")?.optString(0).orEmpty() }
+            }.getOrNull().orEmpty()
+            return if (msg.isNotBlank()) "\n\"${msg.take(120)}\"" else ""
+        }
     }
 
     private fun firstObj(o: JSONObject, vararg keys: String): JSONObject? {
