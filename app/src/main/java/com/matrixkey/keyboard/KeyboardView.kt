@@ -75,7 +75,9 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
     var learnAim = true
 
     private val boxed get() = keyShape != "none"
-    private val allKeys get() = rows.flatMap { it.keys }.filter { it.type != KeyType.SPACER }
+    private val allKeys get() = rows.flatMap { it.keys }
+        .flatMap { if (it.type == KeyType.STACK) it.stack else listOf(it) }
+        .filter { it.type != KeyType.SPACER }
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val label = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
@@ -126,6 +128,20 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
             }
             y += h
         }
+        // Stacked keys span several rows and split that height between their keys.
+        rows.forEachIndexed { ri, row ->
+            for (k in row.keys) {
+                if (k.type != KeyType.STACK || k.stack.isEmpty()) continue
+                val total = rows.drop(ri).take(k.rowSpan).sumOf { rowHeightPx(it).toDouble() }.toFloat()
+                k.hit.bottom = k.hit.top + total
+                val each = total / k.stack.size
+                k.stack.forEachIndexed { i, c ->
+                    val top = k.hit.top + i * each
+                    c.hit.set(k.hit.left, top, k.hit.right, top + each)
+                    c.rect.set(c.hit.left + gapX / 2, top + gapY / 4, c.hit.right - gapX / 2, top + each - gapY / 4)
+                }
+            }
+        }
         keyWidth = rows.firstOrNull { r -> r.keys.any { it.isLetter } }?.keys?.firstOrNull { it.isLetter }?.hit?.width() ?: (width / 10f)
         if (mode == Mode.ALPHA) {
             val centers = HashMap<Char, PointF>()
@@ -154,8 +170,8 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
     override fun onDraw(canvas: Canvas) {
         if (!::theme.isInitialized) return
         val t = theme
-        for (row in rows) for (k in row.keys) {
-            if (k.type == KeyType.SPACER) continue
+        if (!boxed) drawDividers(canvas)
+        for (k in allKeys) {
             val pressed = k === pressedKey
             var bg: Int? = when {
                 k.type == KeyType.ENTER -> t.accent
@@ -173,6 +189,20 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
         }
     }
 
+    /** Thin column lines (number pad) when keys are borderless. */
+    private fun drawDividers(canvas: Canvas) {
+        fill.color = theme.divider
+        val half = 0.5f * dp
+        for (row in rows) for (k in row.keys) {
+            if (k.type == KeyType.STACK) canvas.drawRect(k.hit.right - half, k.hit.top + 6 * dp, k.hit.right + half, k.hit.bottom - 6 * dp, fill)
+            if (k.dividerLeft) canvas.drawRect(k.hit.left - half, k.hit.top, k.hit.left + half, k.hit.bottom, fill)
+        }
+    }
+
+    private val spacePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+    }
+
     private fun drawContent(canvas: Canvas, k: Key) {
         val t = theme
         val fg = if (k.type == KeyType.ENTER) t.onAccent else t.text
@@ -187,7 +217,18 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
             KeyType.BACKSPACE -> Icons.draw(canvas, Icon.BACKSPACE, cx, cy, iconSize * 1.08f, fg, dottedIcons)
             KeyType.ENTER -> Icons.draw(canvas, enterIcon, cx, cy, iconSize * 1.05f, fg, dottedIcons)
             KeyType.EMOJI -> Icons.draw(canvas, Icon.EMOJI, cx, cy, iconSize, fg, dottedIcons)
-            KeyType.SPACE -> {}
+            KeyType.SPACE -> if (k.label.isNotEmpty()) {
+                // A small "␣" mark on labelled space keys (number pad).
+                val w = k.rect.height() * 0.36f
+                val h = w * 0.3f
+                spacePaint.color = fg
+                spacePaint.strokeWidth = 2.2f * dp
+                val path = android.graphics.Path().apply {
+                    moveTo(cx - w / 2, cy - h / 2); lineTo(cx - w / 2, cy + h / 2)
+                    lineTo(cx + w / 2, cy + h / 2); lineTo(cx + w / 2, cy - h / 2)
+                }
+                canvas.drawPath(path, spacePaint)
+            }
             KeyType.NUMPAD -> {
                 // "12" over "34", like a little number pad.
                 label.typeface = typeface

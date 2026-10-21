@@ -2,7 +2,7 @@ package com.matrixkey.keyboard
 
 import android.graphics.RectF
 
-enum class KeyType { CHAR, SHIFT, BACKSPACE, ENTER, SPACE, SYMBOLS, ALPHA, MORE_SYMBOLS, NUMPAD, EMOJI, SPACER }
+enum class KeyType { CHAR, SHIFT, BACKSPACE, ENTER, SPACE, SYMBOLS, ALPHA, MORE_SYMBOLS, NUMPAD, EMOJI, SPACER, STACK }
 
 /** NUMBER is for number/phone fields; NUMPAD is the number pad you open with the 1234 key. */
 enum class Mode { ALPHA, SYMBOLS, MORE_SYMBOLS, NUMBER, NUMPAD }
@@ -21,6 +21,11 @@ class Key(
     val mod: Boolean = false,
     /** Drawn as a pill when keys are borderless (space, ?123, enter). */
     val pill: Boolean = false,
+    /** STACK keys: smaller keys stacked top to bottom, spanning [rowSpan] rows. */
+    val stack: List<Key> = emptyList(),
+    val rowSpan: Int = 1,
+    /** Borderless keys: draw a thin divider line on this key's left edge. */
+    val dividerLeft: Boolean = false,
 ) {
     /** Drawn area. */
     val rect = RectF()
@@ -161,18 +166,34 @@ object Layouts {
         bottomRow(o, "?123", alphaMode = false),
     )
 
-    /** Calculator-style pad: operators on the left, then 1-9, 0 at the bottom. */
+    /**
+     * Number pad (Gboard-style): a narrow column of + - * / on the left spanning
+     * three rows, 1-9 in the middle, % / space / backspace on the right, and
+     * ABC , !?# 0 = . enter along the bottom.
+     */
     private fun numpad(): List<Row> {
+        val digit = 1.55f
         fun op(s: String, vararg more: String) = Key(KeyType.CHAR, s, mod = true, more = more.toList())
-        fun d(s: String) = Key(KeyType.CHAR, s, weight = 1.4f, more = numberHints[s] ?: emptyList())
+        fun d(s: String) = Key(KeyType.CHAR, s, weight = digit, more = numberHints[s] ?: emptyList())
+        val ops = Key(KeyType.STACK, weight = 1f, rowSpan = 3,
+            stack = listOf(op("+", "±"), op("-", "_", "–"), op("*", "×", "^"), op("/", "÷")))
+        val gap = Key(KeyType.SPACER, weight = 1f)
         return listOf(
-            Row(listOf(op("+", "±"), d("1"), d("2"), d("3"), op("/", "%", "÷")), LETTER_ROW_DP),
-            Row(listOf(op("-", "_", "–"), d("4"), d("5"), d("6"), Key(KeyType.SPACE, pill = true)), LETTER_ROW_DP),
-            Row(listOf(op("*", "×", "%", "^"), d("7"), d("8"), d("9"), Key(KeyType.BACKSPACE, mod = true)), LETTER_ROW_DP),
-            Row(listOf(Key(KeyType.ALPHA, "ABC", mod = true, pill = true),
-                Key(KeyType.CHAR, ",", weight = 1.4f, mod = true), d("0"),
-                Key(KeyType.CHAR, ".", weight = 1.4f, mod = true, more = listOf("=", "#", "(", ")")),
-                Key(KeyType.ENTER, pill = true)), LETTER_ROW_DP),
+            Row(listOf(ops, d("1"), d("2"), d("3"),
+                Key(KeyType.CHAR, "%", mod = true, more = listOf("‰"), dividerLeft = true)), LETTER_ROW_DP),
+            Row(listOf(gap, d("4"), d("5"), d("6"),
+                Key(KeyType.SPACE, "space", mod = true, dividerLeft = true)), LETTER_ROW_DP),
+            Row(listOf(gap, d("7"), d("8"), d("9"),
+                Key(KeyType.BACKSPACE, mod = true, dividerLeft = true)), LETTER_ROW_DP),
+            Row(listOf(
+                Key(KeyType.ALPHA, "ABC", weight = 1f, mod = true, pill = true),
+                Key(KeyType.CHAR, ",", weight = 0.75f, mod = true),
+                Key(KeyType.SYMBOLS, "!?#", weight = 1f, mod = true),
+                d("0"),
+                Key(KeyType.CHAR, "=", weight = 0.85f, mod = true),
+                Key(KeyType.CHAR, ".", weight = 0.5f, mod = true, more = listOf("#", "(", ")")),
+                Key(KeyType.ENTER, weight = 1f, pill = true),
+            ), LETTER_ROW_DP),
         )
     }
 
