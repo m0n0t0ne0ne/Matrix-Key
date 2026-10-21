@@ -79,9 +79,9 @@ On free tiers, providers may use the text you send to improve their models. Only
 Releases are built and signed by GitHub Actions, never on a personal machine:
 
 - **Build check** (`.github/workflows/ci.yml`) builds every push and pull request. Nothing is published.
-- **Release** (`.github/workflows/release.yml`): pushing a tag such as `v1.0` builds that exact commit, signs it with the key stored in the repository's encrypted secrets (`KEYSTORE_BASE64`, `KEYSTORE_PASS`), and publishes the release with the APK, its SHA-256 and the signing certificate's fingerprint. Release notes come from `docs/release-notes/<tag>.md`.
+- **Release** (`.github/workflows/release.yml`): running it from the Actions tab, or pushing a tag such as `v1.0`, builds that exact commit, signs it with the key stored in the repository's encrypted secrets (`KEYSTORE_BASE64`, `KEYSTORE_PASS`), and publishes the release with the APK, its SHA-256 and the signing certificate's fingerprint. Release notes come from `docs/release-notes/<tag>.md`.
 
-To release: bump `versionCode` and `versionName` in `app/build.gradle.kts`, add the notes file, then push the tag `v<versionName>`.
+To release: bump `versionCode` and `versionName` in `app/build.gradle.kts` and add the notes file, then run **Actions › Release › Run workflow** (it tags the current `main` commit as `v<versionName>`), or push that tag.
 
 ## Security and licence
 
