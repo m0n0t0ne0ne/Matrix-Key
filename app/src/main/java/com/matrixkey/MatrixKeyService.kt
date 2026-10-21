@@ -607,6 +607,8 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     }
 
     override fun onCursorStep(forward: Boolean): Boolean {
+        // The search / prompt box always types at its end; never move the app's cursor from here.
+        if (target != Target.NONE) return false
         val ic = currentInputConnection ?: return false
         if (composing.isNotEmpty()) {
             ic.finishComposingText()
@@ -633,6 +635,13 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     }
 
     override fun onDeleteSelect(words: Int): Boolean {
+        if (target != Target.NONE) {
+            // Preview: show the box without the last N words; applied on release.
+            if (words == targetDeleteWords) return false
+            targetDeleteWords = words
+            topBar.searchText = dropLastWords(targetText.toString(), words)
+            return true
+        }
         val ic = currentInputConnection ?: return false
         if (composing.isNotEmpty()) {
             ic.finishComposingText(); composing.clear()
@@ -662,6 +671,13 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     }
 
     override fun onDeleteCommit() {
+        if (target != Target.NONE) {
+            val kept = dropLastWords(targetText.toString(), targetDeleteWords)
+            targetText.clear(); targetText.append(kept)
+            topBar.searchText = kept
+            targetDeleteWords = 0
+            return
+        }
         val ic = currentInputConnection ?: return
         if (selEnd > selStart) ic.commitText("", 1)
         deleteAnchor = -1
@@ -910,7 +926,23 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         topBar.mode = TopBarView.BarMode.MESSAGE
     }
 
+    private var targetDeleteWords = 0
+
+    /** "find funny cats" minus 1 word → "find funny " (keeps the space so typing continues). */
+    private fun dropLastWords(text: String, words: Int): String {
+        if (words <= 0) return text
+        var i = text.length
+        var count = 0
+        while (count < words && i > 0) {
+            while (i > 0 && text[i - 1].isWhitespace()) i--
+            while (i > 0 && !text[i - 1].isWhitespace()) i--
+            count++
+        }
+        return text.substring(0, i)
+    }
+
     private fun openTarget(t: Target, hint: String, icon: Icon, initial: String = "") {
+        targetDeleteWords = 0
         target = t
         targetText.clear(); targetText.append(initial)
         topBar.searchHint = hint

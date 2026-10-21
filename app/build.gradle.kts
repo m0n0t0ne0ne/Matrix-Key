@@ -13,8 +13,8 @@ android {
         applicationId = "com.matrixkey"
         minSdk = 29
         targetSdk = 34
-        versionCode = 13
-        versionName = "Update 12"
+        versionCode = 14
+        versionName = "Update 13"
     }
 
     // A fixed key committed to the repo, so every build can be installed as an
