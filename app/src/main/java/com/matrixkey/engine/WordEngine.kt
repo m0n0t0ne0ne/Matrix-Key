@@ -115,6 +115,13 @@ class WordEngine(private val context: Context) {
 
     fun display(w: String): String = casing[w] ?: w
 
+    /**
+     * True when "Block offensive words" should hide [w]. Words you added to your
+     * personal dictionary, or have typed yourself, are always allowed.
+     */
+    private fun hidden(w: String, blockOffensive: Boolean): Boolean =
+        blockOffensive && w in OFFENSIVE && w !in personal && (userCounts[w] ?: 0) == 0
+
     // ------------------------------------------------------------------
     // Typing suggestions & autocorrect
     // ------------------------------------------------------------------
@@ -175,7 +182,7 @@ class WordEngine(private val context: Context) {
         if (contraction != null) candidates[contraction] = (candidates.values.maxOrNull() ?: 0f) + 1f
 
         val filtered = candidates.entries
-            .filter { !blockOffensive || it.key !in OFFENSIVE || it.key == lower }
+            .filter { !hidden(it.key, blockOffensive) || it.key == lower }
             .sortedByDescending { it.value }
             .map { it.key }
 
@@ -221,7 +228,7 @@ class WordEngine(private val context: Context) {
         val fromCommon = p?.let { COMMON_NEXT[it] } ?: emptyList()
         val out = LinkedHashSet<String>()
         (fromBigram + fromCommon + DEFAULT_NEXT).forEach { w ->
-            if (out.size < 3 && (!blockOffensive || w !in OFFENSIVE) && w !in blocked) out += display(w)
+            if (out.size < 3 && !hidden(w.lowercase(), blockOffensive) && w !in blocked) out += display(w)
         }
         return out.toList()
     }
@@ -345,7 +352,7 @@ class WordEngine(private val context: Context) {
             }
         }
         return scored.asSequence()
-            .filter { !blockOffensive || it.first !in OFFENSIVE }
+            .filter { !hidden(it.first, blockOffensive) }
             .sortedByDescending { it.second }
             .map { display(it.first) }
             .distinct()
