@@ -35,7 +35,9 @@ jobs:
           done
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk MatrixKey.apk
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk MatrixKey.apk
+          echo "UPDATE_NAME=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)" >> "$GITHUB_ENV"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -50,10 +52,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: Matrix Key (latest build)
+          name: Matrix Key — ${{ env.UPDATE_NAME }}
           prerelease: true
           make_latest: true
           body: |
-            Automatic build of the newest commit on main.
+            **${{ env.UPDATE_NAME }}** — automatic build of the newest commit on main.
             Download MatrixKey.apk on your phone and open it to install.
           files: MatrixKey.apk

@@ -119,7 +119,7 @@
         <Preference
             android:key="about"
             android:title="About"
-            android:summary="Matrix Key 0.1.0 · Doto font (SIL OFL) · FrequencyWords (CC BY-SA 4.0)"
+            android:summary="Matrix Key · Doto font (SIL OFL) · FrequencyWords (CC BY-SA 4.0)"
             android:selectable="false"
             app:iconSpaceReserved="false" />
     </PreferenceCategory>

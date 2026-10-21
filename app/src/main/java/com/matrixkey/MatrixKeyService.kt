@@ -176,15 +176,9 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         r.addView(bgImage, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         r.addView(column, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         r.addView(overlay, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        r.setOnApplyWindowInsetsListener { v, insets ->
-            val bottom = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                insets.getInsets(WindowInsets.Type.navigationBars()).bottom
-            } else {
-                @Suppress("DEPRECATION") insets.systemWindowInsetBottom
-            }
-            v.setPadding(0, 0, 0, bottom)
-            insets
-        }
+        // Android positions the keyboard window above the navigation bar itself;
+        // the keyboard view must not add any inset padding of its own.
+        r.setOnApplyWindowInsetsListener { _, insets -> insets }
         root = r
         needsReload = true
         applySettings()

@@ -12,17 +12,30 @@ android {
     defaultConfig {
         applicationId = "com.matrixkey"
         minSdk = 29
-        targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        targetSdk = 34
+        versionCode = 3
+        versionName = "Update 2"
+    }
+
+    // A fixed key committed to the repo, so every build can be installed as an
+    // update over the previous one. Fine for personal sideloading; use a
+    // private key before publishing on a store.
+    signingConfigs {
+        create("matrixkey") {
+            storeFile = file("matrixkey.jks")
+            storePassword = "matrixkey"
+            keyAlias = "matrixkey"
+            keyPassword = "matrixkey"
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Signed with the debug key so the release APK installs directly.
-            // Swap in your own keystore before publishing anywhere.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("matrixkey")
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("matrixkey")
         }
     }
 
