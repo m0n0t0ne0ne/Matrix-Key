@@ -14,7 +14,6 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
 import com.matrixkey.engine.WordEngine
-import com.matrixkey.theme.FontManager
 import java.io.File
 
 /** One settings screen, loaded from the XML file named in its arguments. */
@@ -32,6 +31,9 @@ class PrefsFragment : PreferenceFragmentCompat() {
         val name = arguments?.getString("xml") ?: "prefs_main"
         val res = resources.getIdentifier(name, "xml", requireContext().packageName)
         setPreferencesFromResource(res, rootKey)
+        findPreference<Preference>("about")?.setOnPreferenceClickListener {
+            startActivity(Intent(requireContext(), AboutActivity::class.java)); true
+        }
 
         // API keys: show only the last 4 characters.
         SECRET_KEYS.forEach { key ->
@@ -143,8 +145,7 @@ class PrefsFragment : PreferenceFragmentCompat() {
         findPreference<Preference>("voice_mic")?.summary = if (mic) "Allowed" else "Tap to allow"
         findPreference<Preference>("setup")?.isVisible = !(enabled && selected && mic)
         findPreference<Preference>("about")?.summary =
-            "Matrix Key " + (runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "") + " · Nothing fonts found: " + (FontManager.nothingFonts().joinToString { it.label }.ifEmpty { "Doto (SIL OFL), no Nothing fonts found" }) +
-                " · Word list: FrequencyWords (CC BY-SA 4.0)"
+            "Version " + (runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "")
     }
 
     private fun confirm(title: String, msg: String, action: () -> Unit) {

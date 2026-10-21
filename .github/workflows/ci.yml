@@ -1,0 +1,44 @@
+# Builds the app on every push and pull request, so a broken build is caught before release.
+# Nothing is published here; release builds come only from the Release workflow.
+name: Build check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build (debug-signed, never published)
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon assembleRelease 2>&1 | tee build.log
+
+      - name: Report build errors
+        if: failure()
+        run: |
+          grep -E "^e: |error:|What went wrong|ERROR:|Missing class" -A3 build.log | head -40 | while IFS= read -r line; do
+            echo "::error::$line"
+          done
+
+      - name: Report compiler warnings
+        if: always()
+        run: |
+          grep -E "^w: " build.log | sed 's#file://[^ ]*/app/src/main/java/##' | head -40 | while IFS= read -r line; do
+            echo "::notice::$line"
+          done || true

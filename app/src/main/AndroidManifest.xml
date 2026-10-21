@@ -54,6 +54,10 @@
             android:label="@string/theme" />
 
         <activity
+            android:name=".settings.AboutActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".settings.DictionaryActivity"
             android:exported="false"
             android:label="@string/dictionary" />

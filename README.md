@@ -4,11 +4,10 @@ A dot-matrix keyboard for Android, built for Nothing phones. It has Gboard-level
 
 ## Install
 
-1. On your phone, open **[Releases → latest](../../releases/tag/latest)** and download `MatrixKey.apk`.
-2. Open the file and allow installing from your browser or Files app if Android asks.
-3. Open **Matrix Key**, then follow the three setup steps at the top: turn it on, switch to it, and allow the microphone.
-
-Every push to `main` rebuilds the APK automatically with GitHub Actions. You can also download it from the **Actions** tab under *Artifacts*.
+1. On your phone, open **[Releases](../../releases/latest)** and download `MatrixKey-*.apk`.
+2. Open the file and allow installing from your browser or Files app if Android asks. Requires Android 10+ on a 64-bit phone.
+3. Open **Matrix Key**, then follow the setup steps at the top: turn it on, switch to it, and allow the microphone.
+4. Optionally check the download: each release lists the APK's SHA-256 and the signing certificate's fingerprint, which is the same for every release.
 
 ## Features
 
@@ -33,6 +32,8 @@ Every push to `main` rebuilds the APK automatically with GitHub Actions. You can
   - your corrections and undos
   - where your thumbs actually land on each key
 - Tap backspace right after an autocorrection to undo it.
+- **Proofreading:** tap a word in your text to get its suggestions back and swap it.
+- **Number pad** (the 1234 key on the symbols page) and **quick math**: type `5+5(6/2)=` and the answer appears.
 
 **Glide typing**
 - Swipe-to-type that matches the shape of your swipe, with alternatives in the suggestion strip.
@@ -48,6 +49,7 @@ Every push to `main` rebuilds the APK automatically with GitHub Actions. You can
   - Uses the **Gemini free tier**, and switches to the **Groq free tier** when Gemini's limit is hit.
   - Never runs in password fields, and sends nothing until you tap.
 - Voice typing with Android's on-device speech recognizer.
+- **Scan text**: take a photo or pick an image and insert the text it contains (read on the phone).
 
 ## Free API keys
 
@@ -68,11 +70,21 @@ On free tiers, providers may use the text you send to improve their models. Only
 ## Building it yourself
 
 - Requires JDK 17 and the Android SDK (API 35).
-- Run `./gradlew assembleRelease`.
+- Run `./gradlew assembleRelease`. Without a key, the build is signed with your debug key.
+- To sign with your own key, set `KEYSTORE` (path to a `.jks`) and `KEYSTORE_PASS` (its password; key alias `matrixkey`).
 - The build downloads the Doto font (SIL OFL 1.1) and an English word-frequency list ([FrequencyWords](https://github.com/hermitdave/FrequencyWords), CC BY-SA 4.0) into `app/src/main/assets`.
 
-## Not included yet
+### Releases
 
-- Scan text (OCR) from the toolbar.
-- Extra languages beyond English.
-- Floating and split keyboard.
+Releases are built and signed by GitHub Actions, never on a personal machine:
+
+- **Build check** (`.github/workflows/ci.yml`) builds every push and pull request. Nothing is published.
+- **Release** (`.github/workflows/release.yml`): pushing a tag such as `v1.0` builds that exact commit, signs it with the key stored in the repository's encrypted secrets (`KEYSTORE_BASE64`, `KEYSTORE_PASS`), and publishes the release with the APK, its SHA-256 and the signing certificate's fingerprint. Release notes come from `docs/release-notes/<tag>.md`.
+
+To release: bump `versionCode` and `versionName` in `app/build.gradle.kts`, add the notes file, then push the tag `v<versionName>`.
+
+## Security and licence
+
+See [SECURITY.md](SECURITY.md) for how to report a problem and how releases are signed.
+
+The code in this repository is released under the [MIT Licence](LICENSE) and comes with no warranty. Fonts, the word list and libraries keep their own licences; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Unofficial app, not affiliated with Nothing.

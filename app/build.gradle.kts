@@ -13,21 +13,26 @@ android {
         applicationId = "com.matrixkey"
         minSdk = 29
         targetSdk = 34
-        versionCode = 29
-        versionName = "Update 28"
+        versionCode = 30
+        versionName = "1.0"
         // Nothing phones (and nearly every phone since 2019) are 64-bit ARM.
         ndk { abiFilters += "arm64-v8a" }
     }
 
-    // A fixed key committed to the repo, so every build can be installed as an
-    // update over the previous one. Fine for personal sideloading; use a
-    // private key before publishing on a store.
+    // Release signing comes from the environment, so the key never lives in the repo:
+    //   KEYSTORE       path to the .jks file
+    //   KEYSTORE_PASS  its password (keystore and key share it; key alias "matrixkey")
+    // Official releases are signed by the Release workflow with the key held in
+    // GitHub's encrypted secrets. Without these, builds use the debug key.
+    val keystorePath = System.getenv("KEYSTORE")
+    val keystorePass = System.getenv("KEYSTORE_PASS")
+    val hasReleaseKey = !keystorePath.isNullOrEmpty() && !keystorePass.isNullOrEmpty() && file(keystorePath).exists()
     signingConfigs {
-        create("matrixkey") {
-            storeFile = file("matrixkey.jks")
-            storePassword = "matrixkey"
+        if (hasReleaseKey) create("release") {
+            storeFile = file(keystorePath!!)
+            storePassword = keystorePass
             keyAlias = "matrixkey"
-            keyPassword = "matrixkey"
+            keyPassword = keystorePass
         }
     }
 
@@ -37,10 +42,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("matrixkey")
-        }
-        debug {
-            signingConfig = signingConfigs.getByName("matrixkey")
+            signingConfig = if (hasReleaseKey) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }
 
