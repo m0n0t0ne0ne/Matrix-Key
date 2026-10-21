@@ -59,19 +59,26 @@ object Calc {
 
         private fun peek() = if (i < s.length) s[i] else '\u0000'
 
+        /** True when the term just parsed was a bare percentage like "10%". */
+        private var termIsPercent = false
+        private var lastPercent = false
+
+        // Store-calculator percentages: "50+10%" = 50 + 10% of 50 = 55.
         private fun expr(): Double {
             var v = term()
             while (true) {
-                v = when (peek()) {
-                    '+' -> { i++; v + term() }
-                    '-' -> { i++; v - term() }
-                    else -> return v
-                }
+                val op = peek()
+                if (op != '+' && op != '-') return v
+                i++
+                val t = term()
+                val amount = if (termIsPercent) v * t else t
+                v = if (op == '+') v + amount else v - amount
             }
         }
 
         private fun term(): Double {
             var v = power()
+            var percentOnly = lastPercent
             while (true) {
                 val c = peek()
                 v = when {
@@ -79,14 +86,15 @@ object Calc {
                     c == '/' -> { i++; val d = power(); if (d == 0.0) throw ArithmeticException(); v / d }
                     // Implied multiplication: 5(6/2), (1+1)(2), (2)3
                     c == '(' || (c.isDigit() && i > 0 && s[i - 1] == ')') -> v * power()
-                    else -> return v
+                    else -> { termIsPercent = percentOnly; return v }
                 }
+                percentOnly = false
             }
         }
 
         private fun power(): Double {
             val base = unary()
-            if (peek() == '^') { i++; return base.pow(power()) }
+            if (peek() == '^') { i++; val v = base.pow(power()); lastPercent = false; return v }
             return base
         }
 
@@ -98,7 +106,8 @@ object Calc {
 
         private fun postfix(): Double {
             var v = primary()
-            while (peek() == '%') { i++; v /= 100.0 }
+            lastPercent = false
+            while (peek() == '%') { i++; v /= 100.0; lastPercent = true }
             return v
         }
 
