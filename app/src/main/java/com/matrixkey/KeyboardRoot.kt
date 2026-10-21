@@ -2,6 +2,7 @@ package com.matrixkey
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 
@@ -13,6 +14,14 @@ import android.widget.FrameLayout
  */
 @SuppressLint("ViewConstructor")
 class KeyboardRoot(context: Context, private val content: View) : FrameLayout(context) {
+
+    /** Called for every touch on the keyboard (keys, bar, panels). */
+    var onTouch: (() -> Unit)? = null
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        onTouch?.invoke()
+        return super.dispatchTouchEvent(ev)
+    }
 
     init {
         setPadding(0, 0, 0, 0)

@@ -11,6 +11,7 @@ import android.inputmethodservice.InputMethodService
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.View
@@ -91,6 +92,20 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     /** Last glided word and its alternatives. */
     private var lastGlide: String? = null
     private var glideAlternatives: List<String> = emptyList()
+
+    /**
+     * Proofreading: the suggestions each recent word was offered with
+     * (lower-case word → alternatives), so tapping a word in your message brings
+     * them back. Kept in memory only.
+     */
+    private val wordHistory = object : LinkedHashMap<String, List<String>>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<String>>?) = size > 300
+    }
+    /** The word in the text you tapped on, while its suggestions are showing. */
+    private data class EditWord(val start: Int, val end: Int, val word: String)
+    private var editWord: EditWord? = null
+    /** Last time the keyboard itself was touched or changed the text. */
+    private var lastOwnActionAt = 0L
     private var suggestionGen = 0
     private var currentSuggestions: List<String> = emptyList()
     private var autoCorrection: String? = null
@@ -177,6 +192,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             addView(content, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
         val r = KeyboardRoot(ctx, column)
+        r.onTouch = { lastOwnActionAt = SystemClock.uptimeMillis() }
         r.addView(bgImage, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         r.addView(column, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         r.addView(overlay, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -553,6 +569,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         ) correction else typed
         ic.commitText(final, 1)
         val corrected = final != typed
+        remember(final, (if (corrected) listOf(typed) else emptyList()) + currentSuggestions)
         lastCorrection = if (corrected) typed to final else null
         keyboard.commitAim(accepted = !corrected && engine.isKnown(typed))
         learn(final, if (corrected) typed else null)
@@ -609,6 +626,8 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                     if (caps == ShiftState.LOCKED) alt.uppercase() else if (caps == ShiftState.ON) alt.replaceFirstChar { it.uppercase() } else alt
                 }).distinct()
                 if (shift == ShiftState.ON) setShift(ShiftState.OFF)
+                lastOwnActionAt = SystemClock.uptimeMillis()
+                remember(w, glideAlternatives)
                 learn(w, null)
                 showGlideAlternatives(w)
             }
@@ -719,7 +738,90 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         if (composing.isEmpty() && target == Target.NONE && deleteAnchor < 0) {
             val moved = newSelStart != oldSelStart || newSelEnd != oldSelEnd
             if (moved && candidatesStart < 0) updateShiftFromField()
+            // You tapped somewhere in your text (not the keyboard typing): offer
+            // suggestions for the word under the cursor, for easy proofreading.
+            val byTap = SystemClock.uptimeMillis() - lastOwnActionAt > 400
+            if (moved && byTap && candidatesStart < 0 && newSelStart == newSelEnd) suggestForWordAtCursor(newSelEnd)
+            else if (moved && editWord != null && newSelEnd !in editWord!!.start..editWord!!.end) {
+                editWord = null
+                refreshSuggestions()
+            }
         }
+    }
+
+    /** Remembers what [word] was offered alongside, for proofreading later. */
+    private fun remember(word: String, offered: List<String>) {
+        if (noLearning || word.isEmpty()) return
+        val alts = offered.map { it.trim('\u201C', '\u201D') }
+            .filter { a -> a.isNotEmpty() && !a.equals(word, true) && a.any { it.isLetter() } }
+            .distinctBy { it.lowercase() }
+            .take(8)
+        if (alts.isNotEmpty()) wordHistory[word.lowercase()] = alts
+    }
+
+    private fun isWordChar(c: Char) = c.isLetterOrDigit() || c == '\''
+
+    private fun suggestForWordAtCursor(cursor: Int) {
+        val ic = currentInputConnection ?: return
+        if (isPassword || panel != null || !prefs.showSuggestions || !::topBar.isInitialized) return
+        val left = ic.getTextBeforeCursor(48, 0)?.toString().orEmpty().takeLastWhile { isWordChar(it) }
+        val right = ic.getTextAfterCursor(48, 0)?.toString().orEmpty().takeWhile { isWordChar(it) }
+        val word = (left + right).trim('\'')
+        if (word.isEmpty() || !word.any { it.isLetter() }) {
+            if (editWord != null) { editWord = null; refreshSuggestions() }
+            return
+        }
+        val start = cursor - left.length + (left.length - left.trimStart('\'').length)
+        val e = EditWord(start, start + word.length, word)
+        phantomSpace = false; lastGlide = null; lastCorrection = null; tokenSuggestions = false
+        val gen = ++suggestionGen
+        val saved = wordHistory[word.lowercase()]
+        val block = prefs.blockOffensive
+        engineHandler.post {
+            // Words you typed this session come back with what they were offered;
+            // older words get fresh suggestions.
+            val alts = saved ?: engine.suggest(word, null, block, true).suggestions
+                .filter { !it.equals(word, true) }
+            main.post {
+                if (gen != suggestionGen || composing.isNotEmpty()) return@post
+                val cased = alts.map { matchCase(word, it) }.distinctBy { it.lowercase() }
+                editWord = e
+                autoCorrection = null
+                currentSuggestions = listOf(cased.getOrElse(0) { "" }, word, cased.getOrElse(1) { "" }) + cased.drop(2)
+                topBar.mode = TopBarView.BarMode.SUGGESTIONS
+                topBar.suggestions = currentSuggestions
+                topBar.emphasized = 1
+            }
+        }
+    }
+
+    private fun matchCase(model: String, w: String) = when {
+        model.length > 1 && model.all { !it.isLetter() || it.isUpperCase() } -> w.uppercase()
+        model.first().isUpperCase() -> w.replaceFirstChar { it.uppercase() }
+        else -> w
+    }
+
+    /** Swaps the tapped word for the chosen suggestion; the cursor lands after it. */
+    private fun replaceTappedWord(e: EditWord, chosen: String) {
+        val ic = currentInputConnection ?: return
+        editWord = null
+        lastOwnActionAt = SystemClock.uptimeMillis()
+        if (chosen != e.word) {
+            ic.beginBatchEdit()
+            ic.setComposingRegion(e.start, e.end)
+            ic.commitText(chosen, 1)
+            ic.endBatchEdit()
+            remember(chosen, listOf(e.word) + currentSuggestions)
+            val old = e.word
+            if (!noLearning) engineHandler.post {
+                // A misspelling you fixed is remembered as a habit; real words aren't.
+                if (!engine.isKnown(old)) engine.learnCorrection(old.lowercase(), chosen.lowercase())
+                engine.learnWord(chosen, null)
+            }
+        } else {
+            ic.setSelection(e.end, e.end)
+        }
+        refreshSuggestions()
     }
 
     // ------------------------------------------------------------------
@@ -727,6 +829,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     // ------------------------------------------------------------------
 
     private fun refreshSuggestions() {
+        editWord = null
         if (!::topBar.isInitialized || target != Target.NONE) return
         if (topBar.mode == TopBarView.BarMode.MESSAGE) return
         val typed = composing.toString()
@@ -850,6 +953,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         val ic = currentInputConnection ?: return
         var s = currentSuggestions.getOrElse(index) { "" }
         if (s.isEmpty()) return
+        editWord?.let { replaceTappedWord(it, s); return }
         // A glided word: swap it for the chosen alternative.
         val glided = lastGlide
         if (glided != null && composing.isEmpty()) {
@@ -862,6 +966,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                     val p = prevWord
                     if (!noLearning && s.all { it.isLetter() || it == '\'' }) engineHandler.post { engine.learnGlide(s); engine.learnWord(s, p) }
                     glideAlternatives = (listOf(glided) + glideAlternatives).filter { it != s }
+                    remember(s, glideAlternatives)
                     showGlideAlternatives(s)
                 }
             }
@@ -888,6 +993,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             ic.commitText(s, 1)
         } else {
             val typed = composing.toString()
+            remember(s, listOf(typed) + currentSuggestions)
             if (phantomSpace) { ic.commitText(" ", 1); phantomSpace = false }
             ic.commitText(s, 1)
             ic.commitText(" ", 1)
