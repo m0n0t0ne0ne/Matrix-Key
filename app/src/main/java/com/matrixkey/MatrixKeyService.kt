@@ -978,7 +978,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                     ic.commitText(s, 1)
                     lastGlide = s
                     val p = prevWord
-                    if (!noLearning && s.all { it.isLetter() || it == '\'' }) engineHandler.post { engine.learnGlide(s); engine.learnWord(s, p) }
+                    if (!noLearning && s.all { it.isLetter() || it == '\'' }) engineHandler.post { engine.learnGlide(s); engine.rejectGlide(glided); engine.learnWord(s, p) }
                     glideAlternatives = (listOf(glided) + glideAlternatives).filter { it != s }
                     remember(s, glideAlternatives)
                     showGlideAlternatives(s)

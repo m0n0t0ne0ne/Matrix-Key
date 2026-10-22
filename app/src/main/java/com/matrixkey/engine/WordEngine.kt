@@ -349,6 +349,9 @@ class WordEngine private constructor(private val context: Context) {
         val kw = keyWidth
         val user = resample(path, n)
         val anchorPts = if (times.size == path.size) anchors(path, times, kw) else emptyList()
+        val loopPts = loops(path, kw)
+        val ux = path.last().x - path.first().x; val uy = path.last().y - path.first().y
+        val uLen = sqrt(ux * ux + uy * uy)
         val p0 = prev?.lowercase()?.trim { !it.isLetter() && it != '\'' }
         val nextHints = p0?.let { CONTEXT_NEXT[it] }
         val radius = kw * 1.6f
@@ -407,16 +410,46 @@ class WordEngine private constructor(private val context: Context) {
                 val rank = nextHints?.indexOf(w) ?: -1
                 val context = if (rank >= 0) 2.5f - rank * 0.12f else 0f
 
-                val score = -dtw * 6f - miss * 1.25f - extra * 2f - se * 1.1f - lenPen * 2.25f -
-                    anchorCost * 2.25f - cornerCost * 1f +
+                // Two-key words are just a straight line: the ends and the direction decide.
+                val short = pts.size <= 2
+                var direction = 0f
+                if (short && uLen > 1e-3f) {
+                    val ix = pts.last().x - pts.first().x; val iy = pts.last().y - pts.first().y
+                    val iLen = sqrt(ix * ix + iy * iy)
+                    if (iLen > 1e-3f) direction = 1f - (ux * ix + uy * iy) / (uLen * iLen)
+                }
+                // Swype's double-letter gesture: a small loop on the letter ("off", "too", "feel").
+                var loopFit = 0f; var loopsUnexplained = 0f; var loopsMissing = 0f
+                val doubles = doubledLetters(w)
+                if (loopPts.isNotEmpty() || doubles.isNotEmpty()) {
+                    for (c in doubles) {
+                        val kc = keyCenters[c] ?: continue
+                        if (loopPts.any { dist(it, kc) < 0.85f * kw }) loopFit += 1f else if (loopPts.isNotEmpty()) loopsMissing += 1f
+                    }
+                    for (l in loopPts) if (doubles.none { c -> keyCenters[c]?.let { dist(l, it) < 0.85f * kw } == true }) loopsUnexplained += 1f
+                }
+
+                val score = -dtw * 3f - miss * 1.875f - extra * 0.75f - se * 2.475f - (if (short) se * 0.5f else 0f) -
+                    lenPen * 1.125f - anchorCost * 3.375f - cornerCost * 1f - direction * 2f +
+                    loopFit * 4f - loopsUnexplained * 2f - loopsMissing * 0.5f +
                     freq(w) * 0.9f + bigramBoost(prev, w) * 1.2f + context +
-                    (if (habitsGlide[w] != null) 4.5f else 0f) +
+                    (if (habitsGlide[w] != null) 4.5f else 0f) - min(3f, (glideRejected[w] ?: 0) * 1f) +
                     ambiguityBias(w, prev) + (if (w in personal) PERSONAL_GLIDE_BONUS else 0f)
                 scored += w to score
             }
         }
         val ranked = scored.filter { !hidden(it.first, blockOffensive) }.sortedByDescending { it.second }
         val out = ranked.asSequence().map { display(it.first) }.distinct().take(5).toMutableList()
+        // Words that trace exactly the same keys ("of"/"off", "to"/"too") can only be told
+        // apart by a loop, so the twin of the top word is always offered next to it.
+        ranked.firstOrNull()?.first?.let { best ->
+            val keys = keySequence(best)
+            val twin = ranked.firstOrNull { it.first != best && keySequence(it.first) == keys }
+            if (twin != null) {
+                val d = display(twin.first)
+                if (out.indexOf(d) !in 0..1) { out.remove(d); out.add(minOf(1, out.size), d) }
+            }
+        }
         // A dictionary word that was a close call always makes the bar, so it's one tap away.
         val top = ranked.firstOrNull()?.second
         val mine = ranked.firstOrNull { it.first in personal }
@@ -502,14 +535,76 @@ class WordEngine private constructor(private val context: Context) {
 
     /** Swipes for "ill"/"I'll" trace the same keys: let the previous word decide. */
     private fun ambiguityBias(w: String, prev: String?): Float {
+        // Only ever pushes one of the pair down; it must not lift "I'd" above
+        // unrelated words like "of" or "is".
         val p = prev?.lowercase()?.trim { !it.isLetter() }
         for ((plain, pair) in AMBIGUOUS) {
             val (contr, plainAfter) = pair
             if (w != plain && w != contr) continue
             val wantPlain = p in plainAfter
-            return if ((w == plain) == wantPlain) 6f else -6f
+            return if ((w == plain) == wantPlain) 0f else -6f
         }
         return 0f
+    }
+
+    /** Letters that appear twice in a row ("off" → f). */
+    private fun doubledLetters(w: String): List<Char> {
+        val out = ArrayList<Char>()
+        for (i in 0 until w.length - 1) if (w[i] == w[i + 1] && w[i].isLetter()) out += w[i]
+        return out
+    }
+
+    /** The keys a word's swipe passes, with repeats merged ("off" → "of"). */
+    private fun keySequence(w: String): String {
+        val sb = StringBuilder()
+        for (c in w) if (c.isLetter() && (sb.isEmpty() || sb.last() != c)) sb.append(c)
+        return sb.toString()
+    }
+
+    /**
+     * Small loops in the swipe: the path crosses back over itself after 0.6–2.4 keys
+     * of travel, turning steadily one way through most of a circle.
+     */
+    private fun loops(path: List<PointF>, kw: Float): List<PointF> {
+        val step = 0.1f * kw
+        val total = length(path)
+        if (total < 0.6f * kw) return emptyList()
+        val rp = resample(path, max(8, (total / step).toInt() + 1))
+        val n = rp.size
+        val heading = FloatArray(n - 1) { kotlin.math.atan2(rp[it + 1].y - rp[it].y, rp[it + 1].x - rp[it].x) }
+        fun turnAt(k: Int): Float {
+            var dh = heading[k] - heading[k - 1]
+            while (dh > Math.PI) dh -= (2 * Math.PI).toFloat()
+            while (dh < -Math.PI) dh += (2 * Math.PI).toFloat()
+            return dh
+        }
+        val out = ArrayList<PointF>()
+        val maxSpan = (2.4f * kw / step).toInt()
+        var i = 0
+        while (i < n - 6) {
+            var j = i + 6
+            var found = -1
+            while (j < min(n, i + maxSpan)) {
+                if (dist(rp[i], rp[j]) < 0.2f * kw) {
+                    var turn = 0f; var turnAbs = 0f; var maxStep = 0f
+                    for (k in i + 1 until min(j, n - 1)) {
+                        val dh = turnAt(k)
+                        turn += dh; turnAbs += abs(dh); maxStep = max(maxStep, abs(dh))
+                    }
+                    if (abs(turn) > 1.4f * Math.PI && abs(turn) > 0.8f * turnAbs && maxStep < 0.5f * Math.PI) {
+                        var cx = 0f; var cy = 0f
+                        for (k in i..j) { cx += rp[k].x; cy += rp[k].y }
+                        val c = PointF(cx / (j - i + 1), cy / (j - i + 1))
+                        if (out.isEmpty() || dist(out.last(), c) > 0.6f * kw) out += c
+                        found = j
+                    }
+                    break
+                }
+                j++
+            }
+            i = if (found >= 0) found + 1 else i + 1
+        }
+        return out
     }
 
     /** Distance from a point to a polyline. */
@@ -529,6 +624,7 @@ class WordEngine private constructor(private val context: Context) {
     }
 
     private val habitsGlide = HashMap<String, Int>()
+    private val glideRejected = HashMap<String, Int>()
 
     private fun idealPath(w: String): List<PointF>? {
         val out = ArrayList<PointF>()
@@ -626,6 +722,13 @@ class WordEngine private constructor(private val context: Context) {
         dirty = true
     }
 
+    /** You swapped a swiped word for another: rank it a little lower next time. */
+    fun rejectGlide(word: String) {
+        val w = word.lowercase()
+        glideRejected[w] = (glideRejected[w] ?: 0) + 1
+        dirty = true
+    }
+
     // Personal dictionary management -------------------------------------
 
     fun personalWords(): List<String> = personal.toList()
@@ -659,7 +762,7 @@ class WordEngine private constructor(private val context: Context) {
     }
 
     fun resetLearned() {
-        userCounts.clear(); bigrams.clear(); habits.clear(); habitsGlide.clear(); blocked.clear(); casing.clear()
+        userCounts.clear(); bigrams.clear(); habits.clear(); habitsGlide.clear(); glideRejected.clear(); blocked.clear(); casing.clear()
         dirty = true; save(); rebuildIndexes()
     }
 
@@ -678,6 +781,7 @@ class WordEngine private constructor(private val context: Context) {
         put("personal", org.json.JSONArray(personal.toList()))
         put("habits", JSONObject(habits as Map<*, *>))
         put("glide", JSONObject(habitsGlide as Map<*, *>))
+        put("glideNo", JSONObject(glideRejected as Map<*, *>))
         put("blocked", org.json.JSONArray(blocked.toList()))
         put("casing", JSONObject(casing as Map<*, *>))
         val bg = JSONObject()
@@ -686,11 +790,12 @@ class WordEngine private constructor(private val context: Context) {
     }
 
     private fun fromJson(o: JSONObject, merge: Boolean) {
-        if (!merge) { userCounts.clear(); personal.clear(); habits.clear(); habitsGlide.clear(); bigrams.clear(); blocked.clear(); casing.clear() }
+        if (!merge) { userCounts.clear(); personal.clear(); habits.clear(); habitsGlide.clear(); glideRejected.clear(); bigrams.clear(); blocked.clear(); casing.clear() }
         o.optJSONObject("user")?.let { u -> u.keys().forEach { k -> userCounts[k] = (userCounts[k] ?: 0) + u.optInt(k) } }
         o.optJSONArray("personal")?.let { a -> for (i in 0 until a.length()) personal += a.getString(i) }
         o.optJSONObject("habits")?.let { h -> h.keys().forEach { k -> habits[k] = h.getString(k) } }
         o.optJSONObject("glide")?.let { h -> h.keys().forEach { k -> habitsGlide[k] = h.optInt(k) } }
+        o.optJSONObject("glideNo")?.let { h -> h.keys().forEach { k -> glideRejected[k] = h.optInt(k) } }
         o.optJSONArray("blocked")?.let { a -> for (i in 0 until a.length()) blocked += a.getString(i) }
         o.optJSONObject("casing")?.let { h -> h.keys().forEach { k -> casing[k] = h.getString(k) } }
         o.optJSONObject("bigrams")?.let { b ->
