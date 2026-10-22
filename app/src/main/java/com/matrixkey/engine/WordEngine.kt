@@ -264,7 +264,7 @@ class WordEngine private constructor(private val context: Context) {
         if (!ready) return emptyList()
         val p = prev?.lowercase()
         val fromBigram = p?.let { bigrams[it] }?.entries?.sortedByDescending { it.value }?.map { it.key } ?: emptyList()
-        val fromCommon = p?.let { COMMON_NEXT[it] } ?: emptyList()
+        val fromCommon = (p?.let { COMMON_NEXT[it] } ?: emptyList()) + (p?.let { CONTEXT_NEXT[it] } ?: emptyList())
         val out = LinkedHashSet<String>()
         (fromBigram + fromCommon + DEFAULT_NEXT).forEach { w ->
             if (out.size < 3 && !hidden(w.lowercase(), blockOffensive) && w !in blocked) out += display(w)
@@ -325,22 +325,32 @@ class WordEngine private constructor(private val context: Context) {
     // ------------------------------------------------------------------
 
     /**
-     * Decodes a swipe path into ranked words. Path points are in keyboard coordinates.
+     * Decodes a swipe path into ranked words, Swype-style. Path points are in
+     * keyboard coordinates; [times] are their touch times in ms.
      *
-     * Each candidate word (starting near where the swipe starts and ending near
-     * where it ends) is scored on:
-     *  - elastic shape distance (DTW) between the swipe and the word's key path,
-     *    which tolerates speeding up, slowing down and cutting corners;
-     *  - letters of the word the swipe never came near;
-     *  - parts of the swipe the word doesn't explain;
-     *  - start/end distance and overall length mismatch;
-     *  - how common the word is (and how often you use it / after the previous word).
+     * 1. Path analysis: the turning points and slow-downs in the swipe ("anchors")
+     *    mark the letters you meant; straight, fast stretches are just travel.
+     * 2. Every word that starts and ends near the swipe's ends is a candidate.
+     * 3. Each candidate is scored on:
+     *    - the overall shape (elastic DTW distance between the swipe and the word's
+     *      key-to-key path), which tolerates sloppy aim, speed changes and cut corners;
+     *    - whether the anchors line up, in order, with the word's letters, and whether
+     *      the word's own sharp turns have an anchor near them;
+     *    - letters the swipe never came near, and parts of the swipe the word
+     *      doesn't explain;
+     *    - start/end distance and overall length;
+     *    - language: how common the word is, how often you use it, and how likely
+     *      it is after the previous word.
+     * Weights were tuned on simulated careful, fast and sloppy swipes.
      */
-    fun decodeGlide(path: List<PointF>, prev: String?, blockOffensive: Boolean): List<String> {
+    fun decodeGlide(path: List<PointF>, times: List<Long>, prev: String?, blockOffensive: Boolean): List<String> {
         if (!ready || path.size < 2 || keyCenters.isEmpty()) return emptyList()
         val n = 32
         val kw = keyWidth
         val user = resample(path, n)
+        val anchorPts = if (times.size == path.size) anchors(path, times, kw) else emptyList()
+        val p0 = prev?.lowercase()?.trim { !it.isLetter() && it != '\'' }
+        val nextHints = p0?.let { CONTEXT_NEXT[it] }
         val radius = kw * 1.6f
         val startKeys = keyCenters.filter { dist(it.value, path.first()) < radius }.keys
         val endKeys = keyCenters.filter { dist(it.value, path.last()) < radius }.keys
@@ -384,9 +394,23 @@ class WordEngine private constructor(private val context: Context) {
                 extra = extra / n * 4f
                 val se = (dist(path.first(), pts.first()) + dist(path.last(), pts.last())) / kw
                 val lenPen = abs(ln((idealLen / kw + 0.5f) / (pathLen / kw + 0.5f)))
+                var anchorCost = 0f
+                var cornerCost = 0f
+                if (anchorPts.isNotEmpty()) {
+                    anchorCost = anchorAlignment(anchorPts, pts, kw)
+                    for (t in turnLetters(pts)) {
+                        var best = Float.MAX_VALUE
+                        for (a in anchorPts) { val dd = dist(t, a); if (dd < best) best = dd }
+                        cornerCost += max(0f, best / kw - 0.6f)
+                    }
+                }
+                val rank = nextHints?.indexOf(w) ?: -1
+                val context = if (rank >= 0) 2.5f - rank * 0.12f else 0f
 
-                val score = -dtw * 6f - miss * 5f - extra * 4f - se * 2f - lenPen * 1.5f +
-                    freq(w) * 0.6f + bigramBoost(prev, w) * 0.8f + (if (habitsGlide[w] != null) 3f else 0f) +
+                val score = -dtw * 6f - miss * 1.25f - extra * 2f - se * 1.1f - lenPen * 2.25f -
+                    anchorCost * 2.25f - cornerCost * 1f +
+                    freq(w) * 0.9f + bigramBoost(prev, w) * 1.2f + context +
+                    (if (habitsGlide[w] != null) 4.5f else 0f) +
                     ambiguityBias(w, prev) + (if (w in personal) PERSONAL_GLIDE_BONUS else 0f)
                 scored += w to score
             }
@@ -399,6 +423,79 @@ class WordEngine private constructor(private val context: Context) {
         if (top != null && mine != null && top - mine.second < 6f) {
             val d = display(mine.first)
             if (out.indexOf(d) !in 0..2) { out.remove(d); out.add(minOf(1, out.size), d) }
+        }
+        return out
+    }
+
+    /**
+     * Anchors: points where the finger turned sharply or slowed right down,
+     * which is where people pass over the letters they mean.
+     */
+    private fun anchors(path: List<PointF>, times: List<Long>, kw: Float): List<PointF> {
+        val n = path.size
+        if (n < 5) return emptyList()
+        val speed = FloatArray(n)
+        for (i in 0 until n) {
+            val a = max(0, i - 2); val b = min(n - 1, i + 2)
+            val dt = max(1L, times[b] - times[a]).toFloat()
+            var len = 0f
+            for (k in a + 1..b) len += dist(path[k - 1], path[k])
+            speed[i] = len / kw / dt * 100f
+        }
+        val median = speed.sorted()[n / 2].coerceAtLeast(1e-6f)
+        val reach = 0.35f * kw
+        fun back(i: Int): Int { var j = i; var acc = 0f; while (j > 0 && acc < reach) { acc += dist(path[j], path[j - 1]); j-- }; return j }
+        fun fwd(i: Int): Int { var j = i; var acc = 0f; while (j < n - 1 && acc < reach) { acc += dist(path[j], path[j + 1]); j++ }; return j }
+        val k = FloatArray(n)
+        for (i in 1 until n - 1) {
+            val a = back(i); val b = fwd(i)
+            if (a == i || b == i) continue
+            val v1x = path[i].x - path[a].x; val v1y = path[i].y - path[a].y
+            val v2x = path[b].x - path[i].x; val v2y = path[b].y - path[i].y
+            val l1 = sqrt(v1x * v1x + v1y * v1y); val l2 = sqrt(v2x * v2x + v2y * v2y)
+            if (l1 < 1e-3f || l2 < 1e-3f) continue
+            val cos = ((v1x * v2x + v1y * v2y) / (l1 * l2)).coerceIn(-1f, 1f)
+            val turn = (kotlin.math.acos(cos) / Math.PI).toFloat()
+            val slow = max(0f, 1f - speed[i] / (0.45f * median))
+            k[i] = max(turn * 1.6f, slow)
+        }
+        val picked = ArrayList<Int>()
+        for (i in 2 until n - 2) {
+            var isMax = k[i] >= 0.5f
+            if (isMax) for (j in max(0, i - 3)..min(n - 1, i + 3)) if (k[j] > k[i]) { isMax = false; break }
+            if (!isMax) continue
+            if (picked.isEmpty() || dist(path[picked.last()], path[i]) > 0.5f * kw) picked += i
+            else if (k[i] > k[picked.last()]) picked[picked.size - 1] = i
+        }
+        return picked.map { path[it] }.filter { dist(it, path.first()) > 0.5f * kw && dist(it, path.last()) > 0.5f * kw }
+    }
+
+    /** Lines the anchors up with the word's letters, in order (letters may be skipped). */
+    private fun anchorAlignment(anchorPts: List<PointF>, letters: List<PointF>, kw: Float): Float {
+        val l = letters.size
+        var prev = FloatArray(l)
+        var cur = FloatArray(l)
+        for (a in anchorPts) {
+            var best = Float.MAX_VALUE
+            for (j in 0 until l) {
+                best = min(best, prev[j])
+                cur[j] = best + max(0f, dist(a, letters[j]) / kw - 0.45f)
+            }
+            for (j in 1 until l) cur[j] = min(cur[j], cur[j - 1])
+            val t = prev; prev = cur; cur = t
+        }
+        return prev[l - 1]
+    }
+
+    /** Letters where the word's own path turns sharply (more than ~70°). */
+    private fun turnLetters(pts: List<PointF>): List<PointF> {
+        val out = ArrayList<PointF>()
+        for (i in 1 until pts.size - 1) {
+            val v1x = pts[i].x - pts[i - 1].x; val v1y = pts[i].y - pts[i - 1].y
+            val v2x = pts[i + 1].x - pts[i].x; val v2y = pts[i + 1].y - pts[i].y
+            val l1 = sqrt(v1x * v1x + v1y * v1y); val l2 = sqrt(v2x * v2x + v2y * v2y)
+            if (l1 < 1e-3f || l2 < 1e-3f) continue
+            if ((v1x * v2x + v1y * v2y) / (l1 * l2) < 0.35f) out += pts[i]
         }
         return out
     }
@@ -689,6 +786,135 @@ class WordEngine private constructor(private val context: Context) {
         private val FALLBACK = listOf("the", "to", "and", "a", "i", "you", "it", "is", "of", "that", "in", "for", "on", "this", "my", "me", "with", "be", "have", "so", "but", "not", "just", "we", "are", "was", "what", "do", "can", "your", "at", "if", "all", "like", "know", "get", "up", "no", "yes", "ok", "okay", "thanks", "good", "love", "time", "will", "how", "now", "one", "about", "out", "there", "when", "go", "they", "would", "want", "think", "see", "here", "really", "right", "well", "got", "make", "going", "today", "tomorrow", "appropriate")
 
         private val DEFAULT_NEXT = listOf("I", "the", "and", "to", "you", "it", "is")
+
+        /**
+         * Words likely to follow common words ("more" → than, "over" → there …), best first.
+         * Used to rank swipe candidates by context and for next-word predictions.
+         */
+        private val CONTEXT_NEXT: Map<String, List<String>> = run {
+            val m = LinkedHashMap<String, MutableList<String>>()
+            """
+            i:am think have was will can don't just know love want need would really
+            i'm:not going so sure just good fine on in at sorry
+            i'll:be let see do have get call
+            i've:been got never seen
+            i'd:like love be say
+            you:are can know have want were will should need guys too
+            you're:welcome right not so the
+            we:are can have were will should need could
+            we're:going not all here
+            they:are were have will said don't
+            they're:not going all
+            he:is was said has will
+            she:is was said has will
+            it:is was will would
+            it's:a not the so ok okay just been
+            that:is was i you the it's would
+            that's:what why it not so a the
+            this:is was one morning week weekend time
+            what:is are do did time about you happened
+            what's:up the going your
+            how:are is about much many long was do did
+            where:are is did do the
+            when:you i is are the we do
+            why:are is did do not would
+            who:is are was knows
+            can:you i we be not do get
+            could:you be have i we not
+            would:be you have like love not
+            will:be you do have not
+            should:be have we i not
+            do:you not it that this
+            don't:know have want think worry
+            did:you it not i
+            does:it not that this
+            is:it the a not that this
+            are:you we they there the not
+            was:a the it not just so
+            were:you we they not
+            have:a to you been the fun
+            has:been a to the
+            had:a to been the
+            be:a the there able home back
+            been:a the there so
+            get:the to a it back home some
+            got:a it the to my
+            go:to back home out
+            going:to on out home
+            come:back on to over here
+            let:me us it you know
+            let's:go do get see
+            want:to a it the
+            need:to a it the some
+            like:a the to it that this
+            love:you it the to that this
+            know:what that it the how if
+            think:about it so that i you
+            see:you it the what if
+            look:at like for forward
+            make:sure it a the
+            take:a care it the
+            give:me it you
+            tell:me you him her them
+            call:me you me later
+            thank:you god goodness
+            thanks:for so a
+            please:let help send call
+            sorry:i about for to
+            good:morning night luck job day
+            have:a fun been
+            happy:birthday to new
+            on:the my it way your
+            in:the a my your
+            at:the home work a
+            to:the be do get go see
+            for:the a you me your
+            with:you the me a my
+            from:the my you a
+            of:the my course your a
+            about:the it to that you
+            and:i the then you it
+            but:i it the you not
+            so:much i the you it good
+            or:not the a
+            if:you i it the we
+            just:a got want wanted need
+            not:sure the a to really
+            very:much good well
+            too:much late
+            my:mom dad phone friend way
+            your:mom phone way welcome
+            our:own house friends
+            their:own house
+            there:is are was were
+            here:is are
+            more:than
+            less:than
+            better:than
+            rather:than
+            other:than
+            fill:out in
+            in:front
+            right:now there
+            over:there here the
+            out:of there
+            all:the of right
+            some:of time
+            one:of more day
+            each:other
+            see:you
+            miss:you
+            talk:to soon later
+            on:my the
+            going:to
+            """.trimIndent().lines().forEach { line ->
+                val k = line.substringBefore(':').trim()
+                if (k.isEmpty()) return@forEach
+                val list = m.getOrPut(k) { ArrayList() }
+                line.substringAfter(':').trim().split(' ').filter { it.isNotBlank() && it !in list }.forEach { list += it }
+            }
+            m
+        }
 
         private val COMMON_NEXT = mapOf(
             "i" to listOf("am", "think", "have"), "i'm" to listOf("not", "going", "so"),

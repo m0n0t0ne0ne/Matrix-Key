@@ -453,7 +453,7 @@ class ThemeActivity : AppCompatActivity() {
     private val previewListener = object : KeyboardView.Listener {
         override fun onChar(text: String, fromLongPress: Boolean) {}
         override fun onKey(type: KeyType) {}
-        override fun onGlide(path: List<PointF>) {}
+        override fun onGlide(path: List<PointF>, times: List<Long>) {}
         override fun onCursorStep(forward: Boolean) = true
         override fun onDeleteSelect(words: Int) = true
         override fun onDeleteCommit() {}

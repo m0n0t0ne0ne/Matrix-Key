@@ -601,11 +601,11 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         prevWord = word
     }
 
-    override fun onGlide(path: List<PointF>) {
+    override fun onGlide(path: List<PointF>, times: List<Long>) {
         if (target != Target.NONE) {
             // Swiping inside the GIF search / AI prompt box types into that box.
             engineHandler.post {
-                val words = engine.decodeGlide(path, null, prefs.blockOffensive)
+                val words = engine.decodeGlide(path, times, null, prefs.blockOffensive)
                 main.post {
                     val w = words.firstOrNull() ?: return@post
                     if (target == Target.NONE) return@post
@@ -622,7 +622,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         val prev = prevWord
         val caps = shift
         engineHandler.post {
-            val words = engine.decodeGlide(path, prev, prefs.blockOffensive)
+            val words = engine.decodeGlide(path, times, prev, prefs.blockOffensive)
             // Personal-dictionary entries that start with the glided word (e.g. "kevin" → your email).
             val mine = words.firstOrNull()?.let { first -> engine.personalMatches(first).filter { !it.equals(first, true) } }.orEmpty()
             main.post {

@@ -28,7 +28,8 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
     interface Listener {
         fun onChar(text: String, fromLongPress: Boolean = false)
         fun onKey(type: KeyType)
-        fun onGlide(path: List<PointF>)
+        /** [times] are the touch times (ms) of each point, for spotting pauses. */
+        fun onGlide(path: List<PointF>, times: List<Long>)
         /** Moves the cursor one step; returns true when it actually moved. */
         fun onCursorStep(forward: Boolean): Boolean
         /** Selects [words] words back from the cursor (swipe from backspace). Returns true when the selection changed. */
@@ -342,6 +343,10 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
     private var cursorSteps = 0
     private var deleteWords = 0
     private val glidePath = ArrayList<PointF>()
+    private val glideTimes = ArrayList<Long>()
+    /** Time of the touch event being handled (historical events included). */
+    private var eventTime = 0L
+    private var downEventTime = 0L
 
     private val longPress = Runnable { onLongPress() }
     private val repeat = object : Runnable {
@@ -378,6 +383,7 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 pointerId = e.getPointerId(0)
+                eventTime = e.eventTime; downEventTime = e.eventTime
                 down(e.x, e.y)
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
@@ -386,6 +392,7 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
                 else if (state != State.NONE) return true
                 val i = e.actionIndex
                 pointerId = e.getPointerId(i)
+                eventTime = e.eventTime; downEventTime = e.eventTime
                 down(e.getX(i), e.getY(i))
             }
             MotionEvent.ACTION_MOVE -> {
@@ -393,20 +400,26 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
                 if (i >= 0) {
                     lastX = e.getX(i); lastY = e.getY(i)
                     if (state == State.GLIDE) {
-                        for (h in 0 until e.historySize) move(e.getHistoricalX(i, h), e.getHistoricalY(i, h))
+                        for (h in 0 until e.historySize) {
+                            eventTime = e.getHistoricalEventTime(h)
+                            move(e.getHistoricalX(i, h), e.getHistoricalY(i, h))
+                        }
                     }
+                    eventTime = e.eventTime
                     move(e.getX(i), e.getY(i))
                 }
             }
             MotionEvent.ACTION_POINTER_UP -> {
                 val i = e.actionIndex
                 if (e.getPointerId(i) == pointerId) {
+                    eventTime = e.eventTime
                     release(e.getX(i), e.getY(i))
                     pointerId = -1
                 }
             }
             MotionEvent.ACTION_UP -> {
                 val i = e.findPointerIndex(pointerId)
+                eventTime = e.eventTime
                 if (i >= 0) release(e.getX(i), e.getY(i)) else reset()
                 pointerId = -1
             }
@@ -457,9 +470,9 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
                     handler.removeCallbacks(longPress)
                     overlay.hidePopup()
                     state = State.GLIDE
-                    glidePath.clear()
-                    glidePath += PointF(downX, downY)
-                    glidePath += PointF(x, y)
+                    glidePath.clear(); glideTimes.clear()
+                    glidePath += PointF(downX, downY); glideTimes += downEventTime
+                    glidePath += PointF(x, y); glideTimes += eventTime
                     if (trailEnabled) {
                         val p0 = toOverlayPoint(downX, downY); overlay.trailStart(p0.x, p0.y)
                         val p1 = toOverlayPoint(x, y); overlay.trailAdd(p1.x, p1.y)
@@ -501,7 +514,7 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
             State.GLIDE -> {
                 val last = glidePath.last()
                 if (hypot(x - last.x, y - last.y) > 2 * dp) {
-                    glidePath += PointF(x, y)
+                    glidePath += PointF(x, y); glideTimes += eventTime
                     if (trailEnabled) { val p = toOverlayPoint(x, y); overlay.trailAdd(p.x, p.y) }
                 }
             }
@@ -560,8 +573,8 @@ class KeyboardView(context: Context, private val overlay: OverlayView) : View(co
                 wordTaps.clear()
             }
             State.GLIDE -> {
-                glidePath += PointF(x, y)
-                listener?.onGlide(ArrayList(glidePath))
+                glidePath += PointF(x, y); glideTimes += eventTime
+                listener?.onGlide(ArrayList(glidePath), ArrayList(glideTimes))
                 wordTaps.clear()
             }
             State.DELETE -> if (deleteWords > 0) listener?.onDeleteCommit() else listener?.onDeleteSelect(0)
