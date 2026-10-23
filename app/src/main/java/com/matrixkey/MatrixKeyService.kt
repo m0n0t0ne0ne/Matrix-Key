@@ -123,7 +123,6 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     /** Fields that ask for no suggestions (many apps set this just to hide spell-check underlines):
      *  suggestions and next-word predictions still show, but nothing is changed automatically. */
     private var noAutocorrect = false
-    private val I_FORMS = setOf("i", "i'm", "i'll", "i'd", "i've", "i\u2019m", "i\u2019ll", "i\u2019d", "i\u2019ve")
     /** The strip is showing personal-dictionary matches for the text before the cursor. */
     private var tokenSuggestions = false
 
@@ -604,9 +603,8 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         autoCorrection = null
     }
 
-    /** "i", "i'm", "i'll", "i'd", "i've" are always written with a capital I. */
-    private fun capitalI(w: String): String =
-        if (w.isNotEmpty() && w[0] == 'i' && w.lowercase() in I_FORMS) "I" + w.substring(1) else w
+    /** The word "i" on its own is always written "I". */
+    private fun capitalI(w: String): String = if (w == "i") "I" else w
 
     private fun learn(word: String, typo: String?) {
         if (noLearning) { prevWord = word; return }
@@ -1036,6 +1034,8 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         } else {
             val typed = composing.toString()
             s = capitalI(s)
+            // A predicted word picked at the start of a sentence gets its capital.
+            if (typed.isEmpty() && shift == ShiftState.ON && s.isNotEmpty() && s[0].isLowerCase()) s = s.replaceFirstChar { it.uppercase() }
             remember(s, listOf(typed) + currentSuggestions)
             if (phantomSpace) { ic.commitText(" ", 1); phantomSpace = false }
             ic.commitText(s, 1)

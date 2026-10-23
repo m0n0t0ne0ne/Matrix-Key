@@ -91,7 +91,9 @@ class WordEngine private constructor(private val context: Context) {
             val cur = contractions[plain]
             if (cur == null || (base[cur] ?: 0f) < f) contractions[plain] = w
         }
-        listOf("i'm", "i've", "i'll", "i'd").forEach { casing[it] = it.replaceFirstChar { c -> c.uppercase() } }
+        // Only "I" on its own is always a capital; "i'm", "i'll" … follow the sentence
+        // (capital at the start, lowercase otherwise).
+        listOf("i'm", "i've", "i'll", "i'd").forEach { casing.remove(it) }
         casing["i"] = "I"
         val all = HashSet<String>(base.keys).apply { addAll(personal); addAll(userCounts.filterValues { it >= LEARN_AFTER }.keys) }
         all.removeAll(blocked)
