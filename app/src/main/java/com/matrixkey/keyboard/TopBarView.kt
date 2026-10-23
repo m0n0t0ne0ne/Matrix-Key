@@ -30,6 +30,8 @@ class TopBarView(context: Context) : View(context) {
         fun onTool(tool: Tool)
         fun onSearchSubmit()
         fun onSearchClose()
+        /** Tapped inside the search box: put the cursor before character [index]. */
+        fun onSearchCursor(index: Int) {}
         fun onMessageClose()
         /** Close any open panel (emoji, GIFs, clipboard, AI) and show the keys. */
         fun onBackToKeyboard()
@@ -71,6 +73,10 @@ class TopBarView(context: Context) : View(context) {
         set(v) { field = v; invalidate() }
 
     var searchText = ""
+    /** Cursor position in [searchText]. */
+    var searchCursor = 0
+        set(v) { field = v; invalidate() }
+    private var searchScroll = 0f
         set(v) { field = v; invalidate() }
     var searchHint = "Search"
     var searchIcon: Icon = Icon.SEARCH
@@ -265,15 +271,23 @@ class TopBarView(context: Context) : View(context) {
         val baseline = searchBox.centerY() - (fm.ascent + fm.descent) / 2
         var cursorX = searchBox.left + pad
         if (searchText.isEmpty()) {
+            searchScroll = 0f
             leftText.color = t.sub
             canvas.drawText(TextUtils.ellipsize(searchHint, leftText, avail, TextUtils.TruncateAt.END).toString(), searchBox.left + pad + 4 * dp, baseline, leftText)
         } else {
             leftText.color = t.text
-            // Keep the end of the text (where you're typing) visible.
-            var shown = searchText
-            while (leftText.measureText(shown) > avail - 4 * dp && shown.length > 1) shown = shown.substring(1)
-            canvas.drawText(shown, searchBox.left + pad, baseline, leftText)
-            cursorX += leftText.measureText(shown) + 2 * dp
+            // Scroll the text so the cursor stays in view.
+            val cur = searchCursor.coerceIn(0, searchText.length)
+            val toCursor = leftText.measureText(searchText, 0, cur)
+            val room = avail - 6 * dp
+            if (toCursor - searchScroll > room) searchScroll = toCursor - room
+            if (toCursor - searchScroll < 0) searchScroll = toCursor
+            searchScroll = searchScroll.coerceAtLeast(0f)
+            canvas.save()
+            canvas.clipRect(searchBox.left + pad - 2 * dp, searchBox.top, searchBox.right - pad + 2 * dp, searchBox.bottom)
+            canvas.drawText(searchText, searchBox.left + pad - searchScroll, baseline, leftText)
+            canvas.restore()
+            cursorX = searchBox.left + pad + toCursor - searchScroll
         }
         if ((SystemClock.uptimeMillis() / 530) % 2 == 0L) {
             fill.color = t.accent
@@ -301,6 +315,20 @@ class TopBarView(context: Context) : View(context) {
     private var downTime = 0L
     private val longPressMs = 450L
 
+    private var lastUpX = 0f
+
+    /** The character position in the search text closest to [x]. */
+    private fun searchIndexAt(x: Float): Int {
+        if (searchText.isEmpty()) return 0
+        val rel = x - (searchBox.left + 16 * dp) + searchScroll
+        var best = 0; var bestD = Float.MAX_VALUE
+        for (i in 0..searchText.length) {
+            val d = kotlin.math.abs(leftText.measureText(searchText, 0, i) - rel)
+            if (d < bestD) { bestD = d; best = i }
+        }
+        return best
+    }
+
     private fun hitTarget(x: Float, y: Float): Any? {
         if (leftBtn.contains(x, y)) return leftBtn
         when (mode) {
@@ -316,7 +344,10 @@ class TopBarView(context: Context) : View(context) {
                     return toolRects[i]
                 }
             }
-            BarMode.SEARCH -> if (rightBtn.contains(x, y)) return rightBtn
+            BarMode.SEARCH -> {
+                if (rightBtn.contains(x, y)) return rightBtn
+                if (searchBox.contains(x, y)) return searchBox
+            }
             BarMode.MESSAGE -> {}
         }
         return null
@@ -396,6 +427,7 @@ class TopBarView(context: Context) : View(context) {
                 pressed = null
                 invalidate()
                 if (target == null || hitTarget(e.x, e.y) !== target) return true
+                lastUpX = e.x
                 onTapFeedback?.invoke()
                 click(target)
             }
@@ -417,7 +449,11 @@ class TopBarView(context: Context) : View(context) {
                 val i = toolRects.indexOfFirst { it === target }
                 if (i >= 0) { if (panelOpen && tools[i] == activeTool) l.onBackToKeyboard() else l.onTool(tools[i]) }
             }
-            BarMode.SEARCH -> if (target === leftBtn) l.onSearchClose() else l.onSearchSubmit()
+            BarMode.SEARCH -> when {
+                target === leftBtn -> l.onSearchClose()
+                target === searchBox -> l.onSearchCursor(searchIndexAt(lastUpX))
+                else -> l.onSearchSubmit()
+            }
             BarMode.MESSAGE -> if (target === leftBtn) l.onMessageClose()
         }
     }

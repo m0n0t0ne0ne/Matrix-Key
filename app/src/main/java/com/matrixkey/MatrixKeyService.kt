@@ -413,8 +413,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
 
     override fun onChar(text: String, fromLongPress: Boolean) {
         if (target != Target.NONE) {
-            targetText.append(text)
-            targetChanged()
+            targetInsert(text)
             if (shift == ShiftState.ON) setShift(ShiftState.OFF)
             return
         }
@@ -490,7 +489,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     }
 
     private fun onSpace() {
-        if (target != Target.NONE) { targetText.append(' '); targetChanged(); return }
+        if (target != Target.NONE) { targetInsert(" "); return }
         val ic = currentInputConnection ?: return
         val now = System.currentTimeMillis()
         if (composing.isNotEmpty()) {
@@ -518,7 +517,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
 
     private fun onBackspace() {
         if (target != Target.NONE) {
-            if (targetText.isNotEmpty()) targetText.deleteCharAt(targetText.length - 1)
+            if (targetCursor > 0) { targetText.deleteCharAt(targetCursor - 1); targetCursor-- }
             targetChanged()
             return
         }
@@ -621,9 +620,10 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                 main.post {
                     val w = words.firstOrNull() ?: return@post
                     if (target == Target.NONE) return@post
-                    if (targetText.isNotEmpty() && !targetText.endsWith(" ")) targetText.append(' ')
-                    targetText.append(if (shift != ShiftState.OFF) w.replaceFirstChar { it.uppercase() } else w)
-                    targetChanged()
+                    val word = if (shift != ShiftState.OFF) w.replaceFirstChar { it.uppercase() } else w
+                    val before = targetText.getOrNull(targetCursor - 1)
+                    val after = targetText.getOrNull(targetCursor)
+                    targetInsert((if (before != null && before != ' ') " " else "") + word + (if (after != null && after != ' ') " " else ""))
                     if (shift == ShiftState.ON) setShift(ShiftState.OFF)
                 }
             }
@@ -669,8 +669,14 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     }
 
     override fun onCursorStep(forward: Boolean): Boolean {
-        // The search / prompt box always types at its end; never move the app's cursor from here.
-        if (target != Target.NONE) return false
+        // In the search / prompt box, slide the cursor through its text instead of the app's.
+        if (target != Target.NONE) {
+            val next = (targetCursor + if (forward) 1 else -1)
+            if (next < 0 || next > targetText.length) return false
+            targetCursor = next
+            targetChanged()
+            return true
+        }
         val ic = currentInputConnection ?: return false
         if (composing.isNotEmpty()) {
             ic.finishComposingText()
@@ -701,7 +707,9 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             // Preview: show the box without the last N words; applied on release.
             if (words == targetDeleteWords) return false
             targetDeleteWords = words
-            topBar.searchText = dropLastWords(targetText.toString(), words)
+            val head = targetText.substring(0, targetCursor)
+            topBar.searchText = dropLastWords(head, words) + targetText.substring(targetCursor)
+            topBar.searchCursor = dropLastWords(head, words).length
             return true
         }
         val ic = currentInputConnection ?: return false
@@ -734,8 +742,10 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
 
     override fun onDeleteCommit() {
         if (target != Target.NONE) {
-            val kept = dropLastWords(targetText.toString(), targetDeleteWords)
-            targetText.clear(); targetText.append(kept)
+            val head = dropLastWords(targetText.substring(0, targetCursor), targetDeleteWords)
+            val tail = targetText.substring(targetCursor)
+            targetText.clear(); targetText.append(head).append(tail)
+            targetCursor = head.length
             targetChanged()
             targetDeleteWords = 0
             return
@@ -1108,8 +1118,27 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     }
 
     /** The search / prompt line changed: redraw it, and update emoji results live. */
+    /** Where you're typing in the search / prompt box. */
+    private var targetCursor = 0
+
+    private fun targetInsert(text: String) {
+        targetCursor = targetCursor.coerceIn(0, targetText.length)
+        targetText.insert(targetCursor, text)
+        targetCursor += text.length
+        targetChanged()
+    }
+
+    /** You tapped inside the search / prompt box: move the cursor there. */
+    override fun onSearchCursor(index: Int) {
+        if (target == Target.NONE) return
+        targetCursor = index.coerceIn(0, targetText.length)
+        targetChanged()
+    }
+
     private fun targetChanged() {
+        targetCursor = targetCursor.coerceIn(0, targetText.length)
         topBar.searchText = targetText.toString()
+        topBar.searchCursor = targetCursor
         if (target == Target.EMOJI_SEARCH) showEmojiResults(targetText.toString())
     }
 
@@ -1208,6 +1237,8 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         targetDeleteWords = 0
         target = t
         targetText.clear(); targetText.append(initial)
+        targetCursor = initial.length
+        topBar.searchCursor = targetCursor
         topBar.searchHint = hint
         topBar.searchIcon = icon
         topBar.searchText = initial

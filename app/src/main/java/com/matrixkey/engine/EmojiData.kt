@@ -3,12 +3,12 @@ package com.matrixkey.engine
 /** A compact emoji set: categories for the panel and keywords for suggestions. */
 object EmojiData {
     val categories: List<Pair<String, List<String>>> = listOf(
-        "Smileys" to ("😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😙 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🤫 🤔 🤐 🤨 😐 😑 😶 😏 😒 🙄 😬 😮‍💨 🤥 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🥵 🥶 🥴 😵 🤯 🤠 🥳 😎 🤓 🧐 😕 😟 🙁 😮 😯 😲 😳 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 👿 💀 💩 🤡 👻 👽 🤖 😺 😸 😹 😻 😼 😽 🙀 😿 😾").split(" "),
-        "People" to ("👋 🤚 🖐️ ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 👐 🤲 🤝 🙏 ✍️ 💅 💪 🦾 👀 👁️ 👅 👄 🧠 👶 🧒 👦 👧 🧑 👱 👨 🧔 👩 🧓 👴 👵 🙍 🙎 🙅 🙆 💁 🙋 🧏 🙇 🤦 🤷 👮 🕵️ 💂 👷 🤴 👸 👳 🧕 🤵 👰 🤰 🤱 👼 🎅 🦸 🦹 🧙 🧚 🧛 🧜 🧝 💃 🕺 👯 🧖 🧘 👫 👬 👭 💏 💑 👪").split(" "),
+        "Smileys" to ("😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😙 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🤫 🤔 🤐 🤨 😐 😑 😶 😏 😒 🙄 😬 😮‍💨 🤥 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🥵 🥶 🥴 😵 🤯 🤠 🥳 😎 🤓 🧐 😕 😟 🙁 😮 😯 😲 😳 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 👿 💀 💩 🤡 👻 👽 🤖 😺 😸 😹 😻 😼 😽 🙀 😿 😾 ☹️ 🤧 🫡 🫠").split(" "),
+        "People" to ("👋 🤚 🖐️ ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 👐 🤲 🤝 🙏 ✍️ 💅 💪 🦾 👀 👁️ 👅 👄 🧠 👶 🧒 👦 👧 🧑 👱 👨 🧔 👩 🧓 👴 👵 🙍 🙎 🙅 🙆 💁 🙋 🧏 🙇 🤦 🤷 👮 🕵️ 💂 👷 🤴 👸 👳 🧕 🤵 👰 🤰 🤱 👼 🎅 🦸 🦹 🧙 🧚 🧛 🧜 🧝 💃 🕺 👯 🧖 🧘 👫 👬 👭 💏 💑 👪 🫶").split(" "),
         "Animals" to ("🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🙈 🙉 🙊 🐔 🐧 🐦 🐤 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐜 🕷️ 🐢 🐍 🦎 🐙 🦑 🦐 🦀 🐡 🐠 🐟 🐬 🐳 🐋 🦈 🐊 🐅 🐆 🦓 🦍 🐘 🦛 🦏 🐪 🦒 🐃 🐂 🐄 🐎 🐖 🐏 🐑 🐐 🦌 🐕 🐩 🐈 🐓 🦃 🦚 🦜 🦢 🕊️ 🐇 🦝 🦨 🦡 🐁 🐀 🐿️ 🦔 🌵 🎄 🌲 🌳 🌴 🌱 🌿 ☘️ 🍀 🍁 🍂 🍃 🌸 🌺 🌻 🌹 🌷 🌼 💐 🌎 🌙 ⭐ 🌟 ✨ ⚡ 🔥 🌈 ☀️ ⛅ ☁️ 🌧️ ⛈️ ❄️ ☃️ 💧 🌊").split(" "),
         "Food" to ("🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍈 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🍆 🥑 🥦 🥬 🥒 🌶️ 🌽 🥕 🧄 🧅 🥔 🍠 🥐 🥯 🍞 🥖 🧀 🥚 🍳 🥞 🧇 🥓 🥩 🍗 🍖 🌭 🍔 🍟 🍕 🥪 🌮 🌯 🥗 🍝 🍜 🍲 🍛 🍣 🍱 🥟 🍤 🍙 🍚 🍘 🍥 🍢 🍡 🍧 🍨 🍦 🥧 🧁 🍰 🎂 🍮 🍭 🍬 🍫 🍿 🍩 🍪 🥛 ☕ 🍵 🧃 🥤 🍶 🍺 🍻 🥂 🍷 🥃 🍸 🍹 🧉 🍾 🧊").split(" "),
         "Activities" to ("⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🥏 🎱 🏓 🏸 🏒 🏑 🥍 🏏 🥅 ⛳ 🏹 🎣 🥊 🥋 🎽 🛹 ⛸️ 🥌 🎿 ⛷️ 🏂 🏋️ 🤸 ⛹️ 🤺 🤾 🏌️ 🏇 🧘 🏄 🏊 🤽 🚣 🧗 🚵 🚴 🏆 🥇 🥈 🥉 🏅 🎖️ 🎗️ 🎫 🎟️ 🎪 🎭 🎨 🎬 🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🎻 🎲 ♟️ 🎯 🎳 🎮 🕹️ 🧩 🚗 🚕 🚙 🚌 🏎️ 🚓 🚑 🚒 🚚 🚲 🛵 🏍️ ✈️ 🚀 🛸 🚁 ⛵ 🚢 🏠 🏡 🏢 🏥 🏦 🏫 🗽 🗼 🏰 🎡 🎢 🏖️ 🏝️ ⛺").split(" "),
-        "Objects" to ("⌚ 📱 💻 ⌨️ 🖥️ 🖨️ 🖱️ 💾 💿 📷 📸 📹 🎥 📞 ☎️ 📺 📻 🎙️ ⏰ ⌛ 📡 🔋 🔌 💡 🔦 🕯️ 💸 💵 💰 💳 💎 ⚖️ 🔧 🔨 ⚒️ 🛠️ ⛏️ 🔩 ⚙️ 🔫 💣 🔪 🛡️ 🔮 💈 💊 💉 🩹 🧬 🌡️ 🧹 🧺 🧻 🚽 🛁 🔑 🗝️ 🚪 🛋️ 🛏️ 🧸 🖼️ 🛍️ 🛒 🎁 🎈 🎏 🎀 🎊 🎉 ✉️ 📩 📦 📫 📝 📁 📅 📌 📍 ✂️ 🖊️ ✏️ 🔍 🔒 🔓 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 ✅ ❌ ❓ ❗ 💯 🆗 🆒 🆕 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ ➡️ ⬅️ ⬆️ ⬇️ 🔄 ♻️ 🏁 🚩 🏳️ 🏴").split(" "),
+        "Objects" to ("⌚ 📱 💻 ⌨️ 🖥️ 🖨️ 🖱️ 💾 💿 📷 📸 📹 🎥 📞 ☎️ 📺 📻 🎙️ ⏰ ⌛ 📡 🔋 🔌 💡 🔦 🕯️ 💸 💵 💰 💳 💎 ⚖️ 🔧 🔨 ⚒️ 🛠️ ⛏️ 🔩 ⚙️ 🔫 💣 🔪 🛡️ 🔮 💈 💊 💉 🩹 🧬 🌡️ 🧹 🧺 🧻 🚽 🛁 🔑 🗝️ 🚪 🛋️ 🛏️ 🧸 🖼️ 🛍️ 🛒 🎁 🎈 🎏 🎀 🎊 🎉 ✉️ 📩 📦 📫 📝 📁 📅 📌 📍 ✂️ 🖊️ ✏️ 🔍 🔒 🔓 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 ✅ ❌ ❓ ❗ 💯 🆗 🆒 🆕 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ ➡️ ⬅️ ⬆️ ⬇️ 🔄 ♻️ 🏁 🚩 🏳️ 🏴 💍 💥 💤 💦 🎶 🎵 🎃 💼 📚").split(" "),
     )
 
     private val keywords: Map<String, List<String>> = mapOf(
@@ -44,6 +44,45 @@ object EmojiData {
         "😢" to "sad tear", "😡" to "angry mad rage", "😱" to "scream omg shock", "🤯" to "mind blown wow",
         "👋" to "hi hello bye wave", "✅" to "check done yes", "❌" to "no wrong x cross", "☕" to "coffee tea",
         "🍕" to "pizza food", "🍺" to "beer drink", "🎂" to "birthday cake", "🐶" to "dog puppy", "🐱" to "cat kitty",
+        // people and family
+        "👨" to "dad father man guy", "👩" to "mom mother woman lady", "👴" to "grandpa grandfather old",
+        "👵" to "grandma grandmother old", "👶" to "baby kid newborn", "🧒" to "kid child", "👦" to "boy son kid",
+        "👧" to "girl daughter kid", "👪" to "family parents kids", "👫" to "couple friends", "💑" to "couple love",
+        "🤰" to "pregnant baby", "👼" to "angel baby", "🧔" to "beard man dad", "🤵" to "groom wedding suit",
+        "👰" to "bride wedding", "💍" to "ring engaged wedding",
+        // feelings
+        "😀" to "happy smile grin", "😃" to "happy smile joy", "😄" to "happy smile laugh", "😁" to "happy grin smile",
+        "😆" to "happy laugh lol", "😅" to "nervous sweat relief", "🙂" to "smile happy fine", "😊" to "happy smile blush glad",
+        "😇" to "angel innocent", "🤩" to "excited star wow", "😋" to "yum tasty delicious", "😛" to "tongue silly",
+        "😜" to "wink silly crazy", "🤪" to "crazy silly", "😏" to "smirk flirt", "😒" to "unamused meh annoyed",
+        "😔" to "sad pensive down", "😞" to "sad disappointed", "😟" to "worried sad", "🙁" to "sad frown",
+        "☹️" to "sad frown", "😣" to "struggle sad", "😩" to "weary tired sad", "😫" to "tired exhausted",
+        "🥺" to "please puppy eyes sad cute", "😤" to "frustrated angry huff", "😳" to "embarrassed flushed shock",
+        "🥵" to "hot sweat", "🥶" to "cold freezing", "😬" to "awkward grimace oops", "🤐" to "secret quiet zip",
+        "🤫" to "shh quiet secret", "🤭" to "oops giggle", "🥱" to "yawn bored tired", "🤢" to "sick gross nausea",
+        "🤮" to "sick vomit gross", "🤒" to "sick ill fever", "😷" to "sick mask ill", "🤧" to "sick sneeze",
+        "😈" to "devil evil naughty", "🤡" to "clown joke", "👻" to "ghost boo halloween", "💩" to "poop poo",
+        "🤓" to "nerd geek", "🫡" to "salute respect", "🫠" to "melting", "😐" to "neutral meh", "😑" to "meh blank",
+        "🙃" to "upside down sarcasm", "😉" to "wink", "😌" to "relieved calm", "🤤" to "drool hungry",
+        // hands
+        "👌" to "ok okay perfect", "✌️" to "peace victory", "🤞" to "luck fingers crossed hope", "🤙" to "call me shaka",
+        "👊" to "fist bump", "✊" to "fist power", "🤝" to "handshake deal agree", "🙌" to "yay celebrate praise hooray",
+        "👉" to "point right", "👈" to "point left", "☝️" to "point up one", "🫶" to "heart hands love",
+        // hearts and symbols
+        "💔" to "broken heart sad breakup", "💕" to "love hearts", "💖" to "love sparkle heart", "💙" to "blue heart",
+        "💚" to "green heart", "💛" to "yellow heart", "💜" to "purple heart", "🖤" to "black heart", "🧡" to "orange heart",
+        "🤍" to "white heart", "✨" to "sparkle magic shine", "⭐" to "star", "🌟" to "star glow", "💥" to "boom bang",
+        "💤" to "sleep zzz", "💦" to "sweat water", "🎶" to "music notes song", "🎵" to "music note song",
+        // things and places
+        "🏠" to "home house", "🚗" to "car drive", "✈️" to "plane flight travel trip", "🏖️" to "beach vacation holiday",
+        "🎁" to "gift present", "🎄" to "christmas tree xmas", "🎃" to "halloween pumpkin", "💼" to "work job business",
+        "📚" to "books study school read", "✏️" to "pencil write school", "💻" to "laptop computer work",
+        "📱" to "phone mobile call text", "⏰" to "alarm clock time late", "💸" to "money spend pay", "💰" to "money rich cash",
+        "🏆" to "trophy win winner champion", "⚽" to "soccer football ball", "🏀" to "basketball ball", "🏈" to "football",
+        "🍔" to "burger food hamburger", "🍟" to "fries food", "🌮" to "taco food", "🍣" to "sushi food", "🍦" to "ice cream",
+        "🍩" to "donut", "🍪" to "cookie", "🍫" to "chocolate", "🍷" to "wine drink", "🍾" to "champagne celebrate",
+        "🥂" to "cheers toast celebrate", "☀️" to "sun sunny weather", "🌧️" to "rain rainy weather", "❄️" to "snow cold winter",
+        "🌈" to "rainbow pride", "🌙" to "moon night", "🌹" to "rose flower love", "🌸" to "flower blossom spring",
     )
 
     /** Every emoji with the words it can be found by (its Unicode name plus common words). */
