@@ -23,13 +23,13 @@ Open **Settings › Theme** to choose, with a live preview and Cancel / Apply:
 
 ## Toolbar
 
-![The toolbar: Emoji, GIFs, Clipboard, AI writing, Scan text, Settings and Voice](docs/images/toolbar.png)
+![The toolbar: GIFs, Clipboard, AI writing, Scan text, Settings and Voice](docs/images/toolbar.png)
 
 Tap the **grid** button at the top left to switch between the toolbar and word suggestions. When a panel is open, the same button (now a keyboard) takes you back to the keys.
 
 | Button | What it does |
 |---|---|
-| **Emoji** | Emoji panel with your recent emoji |
+| **Emoji** | Opened from the smiley key next to the space bar (the toolbar only gets an emoji button if you turn that key off). Recent emoji, categories, and a **search bar**: type "heart", "thumbs up" or "lol" and tap a result |
 | **GIFs** | Search and send GIFs (needs a free key, see below) |
 | **Clipboard** | Clipboard history with pinning and auto-clear; skips passwords and one-time codes |
 | **AI writing** | Proofread or rewrite your message (needs a free key, see below) |

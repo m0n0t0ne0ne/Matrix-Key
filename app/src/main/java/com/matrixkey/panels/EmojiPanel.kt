@@ -25,6 +25,11 @@ class EmojiPanel(
     private val onEmoji: (String) -> Unit,
     private val onBackspace: () -> Unit,
     private val onClose: () -> Unit,
+    /** Opens the search line ("Search emoji") above the keys. */
+    private val onSearchTap: () -> Unit = {},
+    /** Results of a search, shown first; null for the normal panel. */
+    private val results: List<String>? = null,
+    private val query: String = "",
 ) : LinearLayout(context) {
 
     private val sp = PreferenceManager.getDefaultSharedPreferences(context)
@@ -37,6 +42,9 @@ class EmojiPanel(
 
     init {
         orientation = VERTICAL
+        addView(searchPill(), LayoutParams(LayoutParams.MATCH_PARENT, ui.px(40f)).apply {
+            setMargins(ui.px(8f), ui.px(4f), ui.px(8f), ui.px(2f))
+        })
         scroll.isVerticalScrollBarEnabled = false
         scroll.addView(grid, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
@@ -44,8 +52,26 @@ class EmojiPanel(
         grid.setSections(buildSections())
     }
 
+    private fun searchPill(): View {
+        val row = ui.row()
+        ui.pressable(row, ui.theme.key, 20f)
+        row.setPadding(ui.px(14f), 0, ui.px(14f), 0)
+        val icon = object : View(context) {
+            override fun onDraw(canvas: Canvas) {
+                Icons.draw(canvas, Icon.SEARCH, width / 2f, height / 2f, height * 0.9f, ui.theme.sub, false)
+            }
+        }
+        row.addView(icon, LayoutParams(ui.px(20f), ui.px(20f)))
+        row.addView(ui.text(if (query.isNotBlank()) query else "Search emoji", 15f, if (query.isNotBlank()) ui.theme.text else ui.theme.sub).apply {
+            setPadding(ui.px(10f), 0, 0, 0)
+        })
+        row.setOnClickListener { ui.haptic(it); onSearchTap() }
+        return row
+    }
+
     private fun buildSections(): List<Pair<String, List<String>>> {
         val s = ArrayList<Pair<String, List<String>>>()
+        if (results != null) s += (if (results.isEmpty()) "No matches" else "Results") to results
         if (recents.isNotEmpty()) s += "Recent" to recents.toList()
         s += EmojiData.categories
         return s
@@ -62,7 +88,7 @@ class EmojiPanel(
         val sections = buildSections()
         sections.forEachIndexed { i, (name, list) ->
             val tab = TextView(context).apply {
-                text = if (name == "Recent") "🕘" else list.first()
+                text = when { name == "Recent" -> "🕘"; name == "Results" || list.isEmpty() -> "🔍"; else -> list.first() }
                 textSize = 20f
                 gravity = Gravity.CENTER
                 setPadding(ui.px(10f), 0, ui.px(10f), 0)

@@ -195,7 +195,7 @@ function topBar(ctx, W, th, o) {
   const left = { x: 6, y: top, w: btn, h: btn }, right = { x: W - 6 - btn, y: top, w: btn, h: btn };
   if (o.bar === 'toolbar') {
     roundButton(ctx, left, o.panel ? 'KEYBOARD' : 'GRID', o.panel ? th.chip : null, th.text);
-    const tools = ['EMOJI', 'GIF', 'CLIPBOARD', 'AI', 'SCAN', 'SETTINGS', 'MIC'];
+    const tools = ['GIF', 'CLIPBOARD', 'AI', 'SCAN', 'SETTINGS', 'MIC'];
     const area = W - (left.x + btn) - 8, cell = area / tools.length;
     o.toolCenters = [];
     tools.forEach((t, i) => {
@@ -256,7 +256,7 @@ const PAGE = '#0B0B0B', INK = '#F2F2F2', SUB = '#9A9A9A';
   const ctx = mk('toolbar', W * S, H, PAGE);
   ctx.save(); ctx.beginPath(); ctx.roundRect(0, top, W * S, H - top - 40, 0); ctx.clip();
   keyboard(ctx, 0, top, W, S, th, o); ctx.restore();
-  const names = ['Emoji', 'GIFs', 'Clipboard', 'AI writing', 'Scan text', 'Settings', 'Voice'];
+  const names = ['GIFs', 'Clipboard', 'AI writing', 'Scan text', 'Settings', 'Voice'];
   o.toolCenters.forEach((cx, i) => {
     const x = cx * S, ly = i % 2 === 0 ? 70 : 150;
     ctx.strokeStyle = '#555'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, ly + 28); ctx.lineTo(x, top + 8 * S); ctx.stroke();

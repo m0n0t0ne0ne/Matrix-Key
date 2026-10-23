@@ -21,6 +21,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.core.content.FileProvider
 import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
@@ -73,6 +74,9 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     private lateinit var overlay: OverlayView
     private var panel: View? = null
     private var gifPanel: GifPanel? = null
+    /** Live emoji results above the keys while searching emoji. */
+    private lateinit var emojiStrip: android.widget.HorizontalScrollView
+    private lateinit var emojiStripRow: LinearLayout
     private var aiPanel: AiPanel? = null
     private lateinit var theme: KeyboardTheme
 
@@ -130,7 +134,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     private var isPassword = false
 
     // Internal text field (GIF search, AI prompt, emoji search)
-    private enum class Target { NONE, GIF_SEARCH, AI_PROMPT }
+    private enum class Target { NONE, GIF_SEARCH, AI_PROMPT, EMOJI_SEARCH }
     private var target = Target.NONE
     private val targetText = StringBuilder()
     private var aiPromptAction: AiClient.Action = AiClient.Action.CUSTOM
@@ -192,6 +196,13 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         val column = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             addView(topBar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            emojiStripRow = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+            emojiStrip = android.widget.HorizontalScrollView(ctx).apply {
+                isHorizontalScrollBarEnabled = false
+                visibility = View.GONE
+                addView(emojiStripRow)
+            }
+            addView(emojiStrip, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (48 * resources.displayMetrics.density).toInt()))
             addView(content, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
         val r = KeyboardRoot(ctx, column)
@@ -312,7 +323,8 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         topBar.typeface = tf
         topBar.dotStyle = dot
         topBar.tools = buildList {
-            add(TopBarView.Tool.EMOJI)
+            // The emoji key on the keyboard already opens emoji; only add it here without one.
+            if (!prefs.emojiKey) add(TopBarView.Tool.EMOJI)
             if (prefs.gif) add(TopBarView.Tool.GIF)
             add(TopBarView.Tool.CLIPBOARD)
             if (prefs.ai) add(TopBarView.Tool.AI)
@@ -402,7 +414,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     override fun onChar(text: String, fromLongPress: Boolean) {
         if (target != Target.NONE) {
             targetText.append(text)
-            topBar.searchText = targetText.toString()
+            targetChanged()
             if (shift == ShiftState.ON) setShift(ShiftState.OFF)
             return
         }
@@ -478,7 +490,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     }
 
     private fun onSpace() {
-        if (target != Target.NONE) { targetText.append(' '); topBar.searchText = targetText.toString(); return }
+        if (target != Target.NONE) { targetText.append(' '); targetChanged(); return }
         val ic = currentInputConnection ?: return
         val now = System.currentTimeMillis()
         if (composing.isNotEmpty()) {
@@ -507,7 +519,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     private fun onBackspace() {
         if (target != Target.NONE) {
             if (targetText.isNotEmpty()) targetText.deleteCharAt(targetText.length - 1)
-            topBar.searchText = targetText.toString()
+            targetChanged()
             return
         }
         val ic = currentInputConnection ?: return
@@ -611,7 +623,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                     if (target == Target.NONE) return@post
                     if (targetText.isNotEmpty() && !targetText.endsWith(" ")) targetText.append(' ')
                     targetText.append(if (shift != ShiftState.OFF) w.replaceFirstChar { it.uppercase() } else w)
-                    topBar.searchText = targetText.toString()
+                    targetChanged()
                     if (shift == ShiftState.ON) setShift(ShiftState.OFF)
                 }
             }
@@ -724,7 +736,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         if (target != Target.NONE) {
             val kept = dropLastWords(targetText.toString(), targetDeleteWords)
             targetText.clear(); targetText.append(kept)
-            topBar.searchText = kept
+            targetChanged()
             targetDeleteWords = 0
             return
         }
@@ -1095,9 +1107,54 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         }
     }
 
+    /** The search / prompt line changed: redraw it, and update emoji results live. */
+    private fun targetChanged() {
+        topBar.searchText = targetText.toString()
+        if (target == Target.EMOJI_SEARCH) showEmojiResults(targetText.toString())
+    }
+
+    private fun showEmojiResults(q: String) {
+        if (!::emojiStrip.isInitialized) return
+        emojiStripRow.removeAllViews()
+        val found = com.matrixkey.engine.EmojiData.search(q)
+        val d = resources.displayMetrics.density
+        if (q.isBlank() || found.isEmpty()) {
+            emojiStripRow.addView(TextView(this).apply {
+                text = if (q.isBlank()) "Type to find an emoji" else "No emoji for “${q.trim()}”"
+                setTextColor(theme.sub); textSize = 14f
+                setPadding((16 * d).toInt(), 0, 0, 0)
+            })
+        } else found.take(40).forEach { e ->
+            emojiStripRow.addView(TextView(this).apply {
+                text = e; textSize = 26f
+                gravity = android.view.Gravity.CENTER
+                setPadding((10 * d).toInt(), 0, (10 * d).toInt(), 0)
+                setOnClickListener {
+                    keyboard.feedback.key(it)
+                    rememberEmoji(e)
+                    currentInputConnection?.commitText(e, 1)
+                }
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        }
+        emojiStrip.setBackgroundColor(theme.bg)
+        emojiStrip.visibility = View.VISIBLE
+        emojiStrip.scrollTo(0, 0)
+    }
+
+    private fun rememberEmoji(e: String) {
+        val sp = prefs.sp
+        val recents = sp.getString("recent_emoji", "")!!.split(" ").filter { it.isNotEmpty() && it != e }.toMutableList()
+        recents.add(0, e)
+        sp.edit().putString("recent_emoji", recents.take(32).joinToString(" ")).apply()
+    }
+
     override fun onSearchSubmit() {
         val q = targetText.toString().trim()
         when (target) {
+            Target.EMOJI_SEARCH -> {
+                closeTarget()
+                showEmoji(q)
+            }
             Target.GIF_SEARCH -> {
                 closeTarget()
                 showGif(q)
@@ -1163,6 +1220,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     private fun closeTarget(redraw: Boolean = true) {
         if (target == Target.NONE) return
         target = Target.NONE
+        if (::emojiStrip.isInitialized) emojiStrip.visibility = View.GONE
         targetText.clear()
         if (redraw && ::topBar.isInitialized) {
             topBar.mode = TopBarView.BarMode.SUGGESTIONS
@@ -1209,12 +1267,18 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         refreshSuggestions()
     }
 
-    private fun showEmoji() {
+    private fun showEmoji(query: String = "") {
         if (composing.isNotEmpty()) finishWord(autocorrect = true)
         showPanelView(EmojiPanel(this, ui(),
             onEmoji = { e -> currentInputConnection?.commitText(e, 1); phantomSpace = false },
             onBackspace = { onBackspace() },
-            onClose = { closePanels() }))
+            onClose = { closePanels() },
+            onSearchTap = {
+                openTarget(Target.EMOJI_SEARCH, "Search emoji", Icon.SEARCH)
+                showEmojiResults("")
+            },
+            results = if (query.isNotBlank()) com.matrixkey.engine.EmojiData.search(query) else null,
+            query = query))
     }
 
     private fun showClipboard() {
