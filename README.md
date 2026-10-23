@@ -133,14 +133,11 @@ Tap the **Scan text** button, then **Take photo** or **Choose image**. The text 
 - To sign with your own key, set `KEYSTORE` (path to a `.jks`) and `KEYSTORE_PASS` (its password; key alias `matrixkey`).
 - The build downloads the Doto font (SIL OFL 1.1) and an English word-frequency list ([FrequencyWords](https://github.com/hermitdave/FrequencyWords), CC BY-SA 4.0) into `app/src/main/assets`.
 
-### Releases
+### Official releases
 
-Releases are built and signed by GitHub Actions, never on a personal machine:
+Only the project owner publishes releases. They are built and signed by GitHub Actions from the exact tagged code, with a signing key kept in the repository's encrypted secrets, never on a personal machine and never in this repository. Pull requests only run a build check; nothing is published from them.
 
-- **Build check** (`.github/workflows/ci.yml`) builds every push and pull request. Nothing is published.
-- **Release** (`.github/workflows/release.yml`): running it from the Actions tab, or pushing a tag such as `v1.0`, builds that exact commit, signs it with the key stored in the repository's encrypted secrets (`KEYSTORE_BASE64`, `KEYSTORE_PASS`), and publishes the release with the APK, its SHA-256 and the signing certificate's fingerprint. Release notes come from `docs/release-notes/<tag>.md`.
-
-To release: bump `versionCode` and `versionName` in `app/build.gradle.kts` and add the notes file, then run **Actions › Release › Run workflow** (it tags the current `main` commit as `v<versionName>`), or push that tag.
+Every release lists the APK's SHA-256 and the signing certificate's fingerprint, which is the same for every release. An APK with a different fingerprint is not an official build. See [SECURITY.md](SECURITY.md).
 
 ## Security and licence
 
