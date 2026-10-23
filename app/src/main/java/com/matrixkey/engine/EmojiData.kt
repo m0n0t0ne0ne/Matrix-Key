@@ -85,11 +85,43 @@ object EmojiData {
         "🌈" to "rainbow pride", "🌙" to "moon night", "🌹" to "rose flower love", "🌸" to "flower blossom spring",
     )
 
+    /** Group words: searching "fruit" or "vegetables" shows every one of them. */
+    private val groups: Map<String, String> = mapOf(
+        "fruit fruits" to "🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍈 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🥑",
+        "vegetable vegetables veggie veggies veg" to "🍅 🍆 🥑 🥦 🥬 🥒 🌶️ 🌽 🥕 🧄 🧅 🥔 🍠",
+        "food meal eat" to "🍞 🥐 🥯 🥖 🧀 🥚 🍳 🥞 🧇 🥓 🥩 🍗 🍖 🌭 🍔 🍟 🍕 🥪 🌮 🌯 🥗 🍝 🍜 🍲 🍛 🍣 🍱 🥟 🍤 🍙 🍚 🍘 🍥 🍢 🍡",
+        "dessert desserts sweet sweets candy snack" to "🍧 🍨 🍦 🥧 🧁 🍰 🎂 🍮 🍭 🍬 🍫 🍿 🍩 🍪",
+        "drink drinks beverage" to "🥛 ☕ 🍵 🧃 🥤 🍶 🍺 🍻 🥂 🍷 🥃 🍸 🍹 🧉 🍾 🧊",
+        "alcohol booze" to "🍶 🍺 🍻 🥂 🍷 🥃 🍸 🍹 🍾",
+        "animal animals pet pets" to "🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🐤 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐜 🐢 🐍 🦎 🐙 🦑 🦐 🦀 🐡 🐠 🐟 🐬 🐳 🐋 🦈 🐊 🐅 🐆 🦓 🦍 🐘 🦛 🦏 🐪 🦒 🐃 🐂 🐄 🐎 🐖 🐏 🐑 🐐 🦌 🐕 🐩 🐈 🐓 🦃 🦚 🦜 🦢 🕊️ 🐇 🦝 🦨 🦡 🐁 🐀 🐿️ 🦔",
+        "bird birds" to "🐔 🐧 🐦 🐤 🦆 🦅 🦉 🦃 🦚 🦜 🦢 🕊️ 🐓",
+        "fish sea ocean" to "🐙 🦑 🦐 🦀 🐡 🐠 🐟 🐬 🐳 🐋 🦈 🌊",
+        "bug bugs insect insects" to "🐝 🐛 🦋 🐌 🐞 🐜 🕷️",
+        "plant plants flower flowers nature tree" to "🌵 🎄 🌲 🌳 🌴 🌱 🌿 ☘️ 🍀 🍁 🍂 🍃 🌸 🌺 🌻 🌹 🌷 🌼 💐",
+        "weather sky" to "☀️ ⛅ ☁️ 🌧️ ⛈️ ❄️ ☃️ 🌈 ⚡ 💧 🌊 🌙 ⭐ 🌟",
+        "sport sports ball game" to "⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🥏 🎱 🏓 🏸 🏒 🏑 🥍 🏏 ⛳ 🏹 🎣 🥊 🥋 🛹 ⛸️ 🥌 🎿 ⛷️ 🏂 🏋️ 🤸 ⛹️ 🤺 🤾 🏌️ 🏇 🏄 🏊 🤽 🚣 🧗 🚵 🚴",
+        "vehicle vehicles transport travel" to "🚗 🚕 🚙 🚌 🏎️ 🚓 🚑 🚒 🚚 🚲 🛵 🏍️ ✈️ 🚀 🛸 🚁 ⛵ 🚢",
+        "place places building" to "🏠 🏡 🏢 🏥 🏦 🏫 🗽 🗼 🏰 🎡 🎢 🏖️ 🏝️ ⛺",
+        "heart hearts love" to "❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 🫶",
+        "hand hands gesture" to "👋 🤚 🖐️ ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 👐 🤲 🤝 🙏 ✍️ 💅 🫶",
+        "music instrument" to "🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🎻 🎵 🎶",
+        "money cash pay" to "💸 💵 💰 💳 💎",
+        "tech computer device" to "⌚ 📱 💻 ⌨️ 🖥️ 🖨️ 🖱️ 💾 💿 📷 📸 📹 🎥 📞 ☎️ 📺 📻 🎙️",
+        "cat cats" to "🐱 🐈 😺 😸 😹 😻 😼 😽 🙀 😿 😾",
+        "monkey monkeys" to "🐵 🙈 🙉 🙊",
+        "laugh laughing" to "😂 🤣 😆 😹",
+        "angry mad" to "😤 😡 😠 🤬 👿",
+        "sad crying" to "😢 😭 😔 😞 😟 🙁 ☹️ 😥 😿 💔",
+        "party celebrate celebration" to "🥳 🎉 🎊 🎈 🍾 🥂 🎂 🎁",
+        "christmas xmas holiday" to "🎄 🎅 ❄️ ☃️ 🎁",
+    )
+
     /** Every emoji with the words it can be found by (its Unicode name plus common words). */
     private val index: List<Pair<String, List<String>>> by lazy {
         val aliasesFor = HashMap<String, MutableList<String>>()
         keywords.forEach { (word, list) -> list.forEach { e -> aliasesFor.getOrPut(e) { ArrayList() } += word } }
         extraAliases.forEach { (e, words) -> aliasesFor.getOrPut(e) { ArrayList() } += words.split(' ') }
+        groups.forEach { (names, list) -> list.split(' ').forEach { e -> aliasesFor.getOrPut(e) { ArrayList() } += names.split(' ') } }
         categories.flatMap { it.second }.distinct().map { e ->
             val name = runCatching { Character.getName(e.codePointAt(0)) }.getOrNull().orEmpty().lowercase()
             val words = (name.split(' ', '-') + aliasesFor[e].orEmpty()).filter { it.isNotBlank() }
@@ -111,6 +143,6 @@ object EmojiData {
             }
             if (score > 0) hits += e to (score * 1000 - order)
         }
-        return hits.sortedByDescending { it.second }.map { it.first }.take(80)
+        return hits.sortedByDescending { it.second }.map { it.first }.take(150)
     }
 }

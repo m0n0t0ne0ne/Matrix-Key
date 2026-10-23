@@ -123,6 +123,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     /** Fields that ask for no suggestions (many apps set this just to hide spell-check underlines):
      *  suggestions and next-word predictions still show, but nothing is changed automatically. */
     private var noAutocorrect = false
+    private val I_FORMS = setOf("i", "i'm", "i'll", "i'd", "i've", "i\u2019m", "i\u2019ll", "i\u2019d", "i\u2019ve")
     /** The strip is showing personal-dictionary matches for the text before the cursor. */
     private var tokenSuggestions = false
 
@@ -589,11 +590,12 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         val typed = composing.toString()
         if (typed.isEmpty()) return
         val correction = autoCorrection
-        val final = if (autocorrect && prefs.autocorrect && !noAutocorrect && correction != null &&
+        val final0 = if (autocorrect && prefs.autocorrect && !noAutocorrect && correction != null &&
             !correction.equals(typed, ignoreCase = false) && engine.ready
         ) correction else typed
+        val final = capitalI(final0)
         ic.commitText(final, 1)
-        val corrected = final != typed
+        val corrected = final0 != typed
         remember(final, (if (corrected) listOf(typed) else emptyList()) + currentSuggestions)
         lastCorrection = if (corrected) typed to final else null
         keyboard.commitAim(accepted = !corrected && engine.isKnown(typed))
@@ -601,6 +603,10 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         composing.clear()
         autoCorrection = null
     }
+
+    /** "i", "i'm", "i'll", "i'd", "i've" are always written with a capital I. */
+    private fun capitalI(w: String): String =
+        if (w.isNotEmpty() && w[0] == 'i' && w.lowercase() in I_FORMS) "I" + w.substring(1) else w
 
     private fun learn(word: String, typo: String?) {
         if (noLearning) { prevWord = word; return }
@@ -639,7 +645,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             val mine = words.firstOrNull()?.let { first -> engine.personalMatches(first).filter { !it.equals(first, true) } }.orEmpty()
             main.post {
                 if (words.isEmpty()) return@post
-                var w = words.first()
+                var w = capitalI(words.first())
                 if (caps == ShiftState.LOCKED) w = w.uppercase() else if (caps == ShiftState.ON) w = w.replaceFirstChar { it.uppercase() }
                 val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
                 if (phantomSpace || (before.isNotEmpty() && !before[0].isWhitespace() && before[0] !in "([{\"'")) ic.commitText(" ", 1)
@@ -1029,6 +1035,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             ic.commitText(s, 1)
         } else {
             val typed = composing.toString()
+            s = capitalI(s)
             remember(s, listOf(typed) + currentSuggestions)
             if (phantomSpace) { ic.commitText(" ", 1); phantomSpace = false }
             ic.commitText(s, 1)
@@ -1155,13 +1162,14 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             })
         } else found.take(40).forEach { e ->
             emojiStripRow.addView(TextView(this).apply {
-                text = e; textSize = 26f
+                val shown = com.matrixkey.panels.EmojiPanel.withTone(prefs.sp, e)
+                text = shown; textSize = 26f
                 gravity = android.view.Gravity.CENTER
                 setPadding((10 * d).toInt(), 0, (10 * d).toInt(), 0)
                 setOnClickListener {
                     keyboard.feedback.key(it)
-                    rememberEmoji(e)
-                    currentInputConnection?.commitText(e, 1)
+                    rememberEmoji(shown)
+                    currentInputConnection?.commitText(shown, 1)
                 }
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT))
         }
