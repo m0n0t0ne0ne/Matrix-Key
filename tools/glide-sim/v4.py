@@ -112,7 +112,8 @@ def make(kind, seed, words, reps=2, loop_doubles=True):
 if __name__ == '__main__':
     from multiprocessing import Pool
     kind, seed, which = sys.argv[1], int(sys.argv[2]), sys.argv[3]
-    words = SHORT if which == 'short' else E.WORDS + SHORT if which == 'all' else E.WORDS
+    MIXED = open('mixed_words.txt').read().split()
+    words = SHORT if which == 'short' else E.WORDS + SHORT if which == 'all' else MIXED if which == 'mixed' else E.WORDS
     nl = which == 'short_noloop'
     if nl: words = SHORT
     jobs = make(kind, seed, words, loop_doubles=not nl)

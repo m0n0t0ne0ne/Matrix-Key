@@ -429,8 +429,8 @@ class WordEngine private constructor(private val context: Context) {
                     for (l in loopPts) if (doubles.none { c -> keyCenters[c]?.let { dist(l, it) < 0.85f * kw } == true }) loopsUnexplained += 1f
                 }
 
-                val score = -dtw * 3f - miss * 1.875f - extra * 0.75f - se * 2.475f - (if (short) se * 0.5f else 0f) -
-                    lenPen * 1.125f - anchorCost * 3.375f - cornerCost * 1f - direction * 2f +
+                val score = -dtw * 6.75f - miss * 2.81f - extra * 0.28f - se * 2.475f - (if (short) se * 0.06f else 0f) -
+                    lenPen * 1.69f - anchorCost * 4.45f - cornerCost * 0.7f - direction * 0.5f +
                     loopFit * 4f - loopsUnexplained * 2f - loopsMissing * 0.5f +
                     freq(w) * 0.9f + bigramBoost(prev, w) * 1.2f + context +
                     (if (habitsGlide[w] != null) 4.5f else 0f) - min(3f, (glideRejected[w] ?: 0) * 1f) +
