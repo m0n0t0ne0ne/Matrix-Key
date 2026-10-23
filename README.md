@@ -44,7 +44,7 @@ Tap the **grid** button at the top left to switch between the toolbar and word s
 ![Glide typing: the trail follows your swipe and the best match sits in the middle of the suggestion bar](docs/images/typing.png)
 
 - **Suggestions and autocorrect** that know which keys are next to each other. The bar scrolls sideways for more suggestions, and long words are never shrunk.
-- **Glide typing** with a trail in your accent color (dotted with NDot). Your own dictionary words win close calls.
+- **Glide typing** with a trail in your accent color (dotted with NDot). Your own dictionary words win close calls. **Double letters:** draw a small loop on the letter (o → loop on f for *off*).
 - **Spacebar cursor:** slide on the spacebar to move the cursor, with a haptic tick for every letter.
 - **Delete words:** swipe left from backspace to select whole words, then let go to delete them.
 - **Proofreading:** tap any word in your text to get its suggestions back and swap it.
