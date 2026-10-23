@@ -13,8 +13,8 @@ android {
         applicationId = "com.matrixkey"
         minSdk = 29
         targetSdk = 34
-        versionCode = 39
-        versionName = "1.4.1"
+        versionCode = 40
+        versionName = "1.4.2"
         // Nothing phones (and nearly every phone since 2019) are 64-bit ARM.
         ndk { abiFilters += "arm64-v8a" }
     }

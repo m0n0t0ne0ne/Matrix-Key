@@ -247,7 +247,7 @@ class EmojiPanel(
 
         private fun optionAt(x: Float, y: Float): Int {
             if (popupFor == null) return -1
-            if (y < popupRect.top - cell || y > popupRect.bottom + cell) return -1
+            if (!popupRect.contains(x, y)) return -1
             val w = (popupRect.width() - ui.dp * 8) / popupOptions.size
             val i = ((x - popupRect.left - ui.dp * 4) / w).toInt()
             return if (i in popupOptions.indices) i else -1
@@ -339,7 +339,8 @@ class EmojiPanel(
                     invalidate()
                     if (p != null && hit(e.x, e.y) == p) picked(withTone(sp, sections[p.first].second[p.second]))
                 }
-                MotionEvent.ACTION_CANCEL -> { longPress.removeCallbacksAndMessages(null); pressedIdx = null; invalidate() }
+                // The picker stays open if the touch is taken away (e.g. by scrolling).
+                MotionEvent.ACTION_CANCEL -> { longPress.removeCallbacksAndMessages(null); pressedIdx = null; popupHover = -1; invalidate() }
             }
             return true
         }

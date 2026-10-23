@@ -1160,21 +1160,56 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                 setTextColor(theme.sub); textSize = 14f
                 setPadding((16 * d).toInt(), 0, 0, 0)
             })
-        } else found.take(40).forEach { e ->
-            emojiStripRow.addView(TextView(this).apply {
-                val shown = com.matrixkey.panels.EmojiPanel.withTone(prefs.sp, e)
-                text = shown; textSize = 26f
-                gravity = android.view.Gravity.CENTER
-                setPadding((10 * d).toInt(), 0, (10 * d).toInt(), 0)
-                setOnClickListener {
-                    keyboard.feedback.key(it)
-                    rememberEmoji(shown)
-                    currentInputConnection?.commitText(shown, 1)
-                }
-            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        }
+        } else found.take(40).forEach { e -> emojiStripRow.addView(stripEmoji(e, q)) }
         emojiStrip.setBackgroundColor(theme.bg)
         emojiStrip.visibility = View.VISIBLE
+        emojiStrip.scrollTo(0, 0)
+    }
+
+    /** One emoji in the search strip: tap inserts it; long-press shows its skin tones. */
+    private fun stripEmoji(e: String, q: String, toneChoice: Boolean = false): View {
+        val d = resources.displayMetrics.density
+        val shown = if (toneChoice) e else com.matrixkey.panels.EmojiPanel.withTone(prefs.sp, e)
+        return TextView(this).apply {
+            text = shown; textSize = 26f
+            gravity = android.view.Gravity.CENTER
+            setPadding((10 * d).toInt(), 0, (10 * d).toInt(), 0)
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            setOnClickListener {
+                keyboard.feedback.key(it)
+                rememberEmoji(shown)
+                currentInputConnection?.commitText(shown, 1)
+                if (toneChoice) showEmojiResults(q)
+            }
+            if (!toneChoice && com.matrixkey.panels.EmojiPanel.toneBase(e) != null) setOnLongClickListener {
+                keyboard.feedback.key(it)
+                showToneChoices(e, q)
+                true
+            }
+        }
+    }
+
+    /** Swaps the search strip for the emoji's skin tones until you pick one or go back. */
+    private fun showToneChoices(e: String, q: String) {
+        val d = resources.displayMetrics.density
+        emojiStripRow.removeAllViews()
+        emojiStripRow.addView(TextView(this).apply {
+            text = "‹"; textSize = 26f; setTextColor(theme.sub)
+            gravity = android.view.Gravity.CENTER
+            setPadding((14 * d).toInt(), 0, (10 * d).toInt(), 0)
+            setOnClickListener { keyboard.feedback.key(it); showEmojiResults(q) }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        for (option in com.matrixkey.panels.EmojiPanel.toneOptions(e)) {
+            val v = stripEmoji(option, q, toneChoice = true)
+            v.setOnClickListener {
+                keyboard.feedback.key(it)
+                com.matrixkey.panels.EmojiPanel.saveTone(prefs.sp, e, option)
+                rememberEmoji(option)
+                currentInputConnection?.commitText(option, 1)
+                showEmojiResults(q)
+            }
+            emojiStripRow.addView(v)
+        }
         emojiStrip.scrollTo(0, 0)
     }
 
