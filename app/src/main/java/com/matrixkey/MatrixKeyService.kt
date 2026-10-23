@@ -369,10 +369,22 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         noLearning = isPassword || !prefs.learn || (prefs.incognito && incognitoField)
     }
 
+    /**
+     * Multi-line fields and message boxes (texts, chats, emails) get a new line from
+     * the enter key; the app's own send button sends.
+     */
+    private fun enterMakesNewLine(info: EditorInfo?): Boolean {
+        if (info == null) return false
+        val variation = info.inputType and InputType.TYPE_MASK_VARIATION
+        val cls = info.inputType and InputType.TYPE_MASK_CLASS
+        return (info.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0 ||
+            (cls == InputType.TYPE_CLASS_TEXT && (variation == InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE ||
+                variation == InputType.TYPE_TEXT_VARIATION_LONG_MESSAGE))
+    }
+
     private fun updateEnterIcon(info: EditorInfo) {
         val action = info.imeOptions and EditorInfo.IME_MASK_ACTION
-        val noAction = (info.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0 ||
-            (info.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
+        val noAction = (info.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0 || enterMakesNewLine(info)
         keyboard.enterIcon = if (noAction) Icon.ENTER else when (action) {
             EditorInfo.IME_ACTION_SEARCH -> Icon.SEARCH
             EditorInfo.IME_ACTION_SEND -> Icon.SEND
@@ -570,9 +582,13 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         phantomSpace = false
         val ei = currentInputEditorInfo
         val action = (ei?.imeOptions ?: 0) and EditorInfo.IME_MASK_ACTION
-        val noAction = ei == null || (ei.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0 ||
-            (ei.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
-        if (!noAction && action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED) {
+        val newLine = enterMakesNewLine(ei)
+        val noAction = ei == null || (ei.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0 || newLine
+        if (newLine) {
+            // Type the line break as text: some messaging apps treat an Enter key
+            // press as "send", but a typed new line is always just a new line.
+            ic.commitText("\n", 1)
+        } else if (!noAction && action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED) {
             ic.performEditorAction(action)
         } else {
             ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
