@@ -1241,6 +1241,16 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         }
     }
 
+    /** Swipe down on the suggestion bar / toolbar: close the keyboard. */
+    override fun onSwipeDown() {
+        keyboard.feedback.tick(keyboard)
+        if (composing.isNotEmpty()) finishWord(autocorrect = false)
+        closeTarget(redraw = false)
+        if (voice.listening) voice.stop()
+        closePanels()
+        requestHideSelf(0)
+    }
+
     /** The keyboard button in the search line goes straight back to typing. */
     override fun onSearchClose() = onBackToKeyboard()
 

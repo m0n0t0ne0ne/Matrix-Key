@@ -32,6 +32,8 @@ class TopBarView(context: Context) : View(context) {
         fun onSearchClose()
         /** Tapped inside the search box: put the cursor before character [index]. */
         fun onSearchCursor(index: Int) {}
+        /** Swiped down on the bar: put the keyboard away. */
+        fun onSwipeDown() {}
         fun onMessageClose()
         /** Close any open panel (emoji, GIFs, clipboard, AI) and show the keys. */
         fun onBackToKeyboard()
@@ -407,12 +409,29 @@ class TopBarView(context: Context) : View(context) {
     }
 
     private var stripGesture = false
+    private var swipeDownX = 0f
+    private var swipeDownY = 0f
+    private var swipedDown = false
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(e: MotionEvent): Boolean {
         if (e.actionMasked == MotionEvent.ACTION_DOWN) {
             layoutRects()
             stripGesture = mode == BarMode.SUGGESTIONS && strip.contains(e.x, e.y)
+            swipeDownX = e.x; swipeDownY = e.y; swipedDown = false
+        }
+        // Swipe down anywhere on the bar to hide the keyboard.
+        if (swipedDown) return true
+        if (e.actionMasked == MotionEvent.ACTION_MOVE) {
+            val dy = e.y - swipeDownY
+            val dx = kotlin.math.abs(e.x - swipeDownX)
+            if (dy > 36 * dp && dy > dx * 1.5f) {
+                swipedDown = true
+                pressed = null; pressedItem = -1; dragging = false
+                invalidate()
+                listener?.onSwipeDown()
+                return true
+            }
         }
         if (stripGesture) return stripTouch(e)
         when (e.actionMasked) {

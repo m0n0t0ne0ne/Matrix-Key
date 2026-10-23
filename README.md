@@ -25,7 +25,7 @@ Open **Settings › Theme** to choose, with a live preview and Cancel / Apply:
 
 ![The toolbar: GIFs, Clipboard, AI writing, Scan text, Settings and Voice](docs/images/toolbar.png)
 
-Tap the **grid** button at the top left to switch between the toolbar and word suggestions. When a panel is open, the same button (now a keyboard) takes you back to the keys.
+Tap the **grid** button at the top left to switch between the toolbar and word suggestions. **Swipe down** on the toolbar or suggestion bar to put the keyboard away. When a panel is open, the same button (now a keyboard) takes you back to the keys.
 
 | Button | What it does |
 |---|---|
