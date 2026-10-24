@@ -153,6 +153,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     // ------------------------------------------------------------------
 
     companion object {
+        private const val SCAN_CHIP = "Insert scanned text"
         /** The running keyboard, so Scan text can hand its result straight over. */
         @Volatile var instance: MatrixKeyService? = null
     }
@@ -253,7 +254,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             var tries = 0
             val check = object : Runnable {
                 override fun run() {
-                    if (prefs.sp.getString(ScanActivity.PENDING, null) == null) return  // already inserted
+                    if (prefs.sp.getString(ScanActivity.PENDING, null) == null && scanText == null) return
                     val ei = currentInputEditorInfo
                     if (ei != null && ei.packageName != packageName && currentInputConnection != null && isInputViewShown) {
                         insertPendingScan()
@@ -266,15 +267,42 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         }
     }
 
-    /** Text picked in Scan text is inserted when you return to the app you were typing in. */
+    /** Scanned text waiting to go in; offered as a suggestion until it's in the message. */
+    private var scanText: String? = null
+    private var scanInFlight = false
+
+    /**
+     * Types the scanned text in, then checks it actually arrived (some apps ignore text
+     * sent while their box is still being set up). If it didn't, it's offered as a
+     * suggestion to tap instead.
+     */
     private fun insertPendingScan() {
-        val text = prefs.sp.getString(ScanActivity.PENDING, null) ?: return
-        val at = prefs.sp.getLong(ScanActivity.PENDING_AT, 0)
-        prefs.sp.edit().remove(ScanActivity.PENDING).remove(ScanActivity.PENDING_AT).apply()
-        if (System.currentTimeMillis() - at > 5 * 60_000L || isPassword) return
+        prefs.sp.getString(ScanActivity.PENDING, null)?.let { t ->
+            val at = prefs.sp.getLong(ScanActivity.PENDING_AT, 0)
+            prefs.sp.edit().remove(ScanActivity.PENDING).remove(ScanActivity.PENDING_AT).apply()
+            if (System.currentTimeMillis() - at <= 10 * 60_000L) scanText = t
+        }
+        val text = scanText ?: return
+        if (isPassword) { scanText = null; return }
+        if (scanInFlight) return
         val ic = currentInputConnection ?: return
+        scanInFlight = true
         val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
         ic.commitText((if (before.isNotEmpty() && !before[0].isWhitespace()) " " else "") + text, 1)
+        val tail = text.takeLast(12)
+        main.postDelayed({
+            val now = currentInputConnection?.getTextBeforeCursor(tail.length + 2, 0)?.toString().orEmpty()
+            scanInFlight = false
+            if (now.contains(tail)) { scanText = null; refreshSuggestions() } else showScanChip()
+        }, 350)
+    }
+
+    private fun showScanChip() {
+        if (scanText == null || !::topBar.isInitialized) return
+        currentSuggestions = listOf("", SCAN_CHIP, "")
+        topBar.mode = TopBarView.BarMode.SUGGESTIONS
+        topBar.suggestions = currentSuggestions
+        topBar.emphasized = 1
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -918,6 +946,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     private fun refreshSuggestions() {
         editWord = null
         if (!::topBar.isInitialized || target != Target.NONE) return
+        if (scanText != null && !scanInFlight && currentInputEditorInfo?.packageName != packageName) { showScanChip(); return }
         if (topBar.mode == TopBarView.BarMode.MESSAGE) return
         val typed = composing.toString()
         val gen = ++suggestionGen
@@ -1040,6 +1069,14 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         val ic = currentInputConnection ?: return
         var s = currentSuggestions.getOrElse(index) { "" }
         if (s.isEmpty()) return
+        if (s == SCAN_CHIP) {
+            val text = scanText ?: return
+            scanText = null
+            val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
+            ic.commitText((if (before.isNotEmpty() && !before[0].isWhitespace()) " " else "") + text, 1)
+            refreshSuggestions()
+            return
+        }
         editWord?.let { replaceTappedWord(it, s); return }
         // A glided word: swap it for the chosen alternative.
         val glided = lastGlide
