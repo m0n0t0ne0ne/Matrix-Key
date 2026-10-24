@@ -41,6 +41,8 @@ class ScanActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var result: EditText
     private lateinit var insert: Button
+    private lateinit var picker: TextSelectView
+    private lateinit var pickerTools: LinearLayout
     private var photoUri: Uri? = null
     private val dp get() = resources.displayMetrics.density
     private fun px(v: Float) = (v * dp).toInt()
@@ -70,6 +72,23 @@ class ScanActivity : AppCompatActivity() {
             setPadding(px(4f), px(16f), px(4f), px(12f))
         }
         col.addView(status)
+
+        // The photo with its words outlined: tap or drag to choose what to insert.
+        picker = TextSelectView(this, ContextCompat.getColor(this, R.color.mk_red)).apply {
+            visibility = android.view.View.GONE
+            onChange = { t -> result.setText(t); insert.isEnabled = t.isNotBlank() }
+        }
+        col.addView(picker, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = px(8f)
+        })
+        pickerTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; visibility = android.view.View.GONE }
+        pickerTools.addView(mkButton(this, false).apply { text = "Select all"; setOnClickListener { picker.selectAll(true) } },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = px(8f) })
+        pickerTools.addView(mkButton(this, false).apply { text = "Clear"; setOnClickListener { picker.selectAll(false) } },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        col.addView(pickerTools, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = px(12f)
+        })
 
         result = EditText(this).apply {
             hint = "Recognized text appears here. Edit it before inserting."
@@ -154,10 +173,12 @@ class ScanActivity : AppCompatActivity() {
                 val t = text.text.trim()
                 if (t.isEmpty()) {
                     status.text = "No text found. Try again closer, with more light."
+                    picker.visibility = android.view.View.GONE; pickerTools.visibility = android.view.View.GONE
                 } else {
-                    status.text = "Found text. Edit it if you like, then tap Insert text."
+                    status.text = "Tap words to add or remove them, or drag across the words you want. Edit below if you like, then tap Insert text."
                     result.setText(t)
                     insert.isEnabled = true
+                    showPicker(uri, image.width, image.height, text)
                 }
             }
             .addOnFailureListener {
@@ -166,6 +187,32 @@ class ScanActivity : AppCompatActivity() {
                     "Google Play services is still downloading the text reader. Try again in a minute."
                 else "Couldn't read text: $m"
             }
+    }
+
+    /** Shows the photo with each recognised word outlined for picking. */
+    private fun showPicker(uri: Uri, photoWidth: Int, photoHeight: Int, text: com.google.mlkit.vision.text.Text) {
+        val words = ArrayList<TextSelectView.Word>()
+        var line = 0
+        for (block in text.textBlocks) for (l in block.lines) {
+            for (el in l.elements) el.boundingBox?.let { words += TextSelectView.Word(el.text, it, line) }
+            line++
+        }
+        if (words.isEmpty()) return
+        val bmp = runCatching {
+            val src = android.graphics.ImageDecoder.createSource(contentResolver, uri)
+            android.graphics.ImageDecoder.decodeBitmap(src) { d, info, _ ->
+                d.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
+                val w = info.size.width
+                if (w > 1600) d.setTargetSize(1600, (info.size.height * 1600f / w).toInt())
+            }
+        }.getOrNull() ?: return
+        // Make sure the picture is the same way up as the image the words were read from.
+        val shown = if ((bmp.width > bmp.height) != (photoWidth > photoHeight) && photoWidth != photoHeight)
+            android.graphics.Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, android.graphics.Matrix().apply { postRotate(90f) }, true)
+        else bmp
+        picker.set(shown, photoWidth, words)
+        picker.visibility = android.view.View.VISIBLE
+        pickerTools.visibility = android.view.View.VISIBLE
     }
 
     private fun done() {
