@@ -174,7 +174,8 @@ class ScanActivity : AppCompatActivity() {
             PreferenceManager.getDefaultSharedPreferences(this).edit()
                 .putString(PENDING, t)
                 .putLong(PENDING_AT, System.currentTimeMillis())
-                .apply()
+                .commit()
+            MatrixKeyService.instance?.scanReady()
         }
         finish()
     }

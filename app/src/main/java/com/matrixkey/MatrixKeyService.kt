@@ -152,8 +152,14 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     // Lifecycle
     // ------------------------------------------------------------------
 
+    companion object {
+        /** The running keyboard, so Scan text can hand its result straight over. */
+        @Volatile var instance: MatrixKeyService? = null
+    }
+
     override fun onCreate() {
         super.onCreate()
+        instance = this
         prefs = Prefs(this)
         prefs.sp.registerOnSharedPreferenceChangeListener(this)
         engine = WordEngine.get(this)
@@ -167,6 +173,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     }
 
     override fun onDestroy() {
+        if (instance === this) instance = null
         prefs.sp.unregisterOnSharedPreferenceChangeListener(this)
         runCatching { (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).removePrimaryClipChangedListener(clipListener) }
         voice.stop()
@@ -234,6 +241,29 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         setMode(modeFor(info))
         updateShiftFromField()
         refreshSuggestions()
+    }
+
+    /**
+     * Scan text's "Insert text" was tapped. As soon as the app you came from has its
+     * text box back (not Matrix Key's own screen), type the text in. If the keyboard
+     * isn't open there yet, it's inserted the next time it opens in that app.
+     */
+    fun scanReady() {
+        main.post {
+            var tries = 0
+            val check = object : Runnable {
+                override fun run() {
+                    if (prefs.sp.getString(ScanActivity.PENDING, null) == null) return  // already inserted
+                    val ei = currentInputEditorInfo
+                    if (ei != null && ei.packageName != packageName && currentInputConnection != null && isInputViewShown) {
+                        insertPendingScan()
+                        return
+                    }
+                    if (++tries < 40) main.postDelayed(this, 150)
+                }
+            }
+            main.postDelayed(check, 200)
+        }
     }
 
     /** Text picked in Scan text is inserted when you return to the app you were typing in. */
