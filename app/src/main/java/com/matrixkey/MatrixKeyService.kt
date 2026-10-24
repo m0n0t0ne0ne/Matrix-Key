@@ -227,7 +227,8 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         closeTarget(redraw = false)
         hidePanel()
         readField(info)
-        insertPendingScan()
+        // Not into Matrix Key's own screens (the Scan text box itself): wait for the app you came from.
+        if (info.packageName != packageName) insertPendingScan()
         selStart = info.initialSelStart; selEnd = info.initialSelEnd
         updateEnterIcon(info)
         setMode(modeFor(info))
