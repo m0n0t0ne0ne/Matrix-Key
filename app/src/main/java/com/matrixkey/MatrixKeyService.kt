@@ -282,19 +282,42 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             prefs.sp.edit().remove(ScanActivity.PENDING).remove(ScanActivity.PENDING_AT).apply()
             if (System.currentTimeMillis() - at <= 10 * 60_000L) scanText = t
         }
-        val text = scanText ?: return
+        if (scanText == null) return
         if (isPassword) { scanText = null; return }
         if (scanInFlight) return
-        val ic = currentInputConnection ?: return
         scanInFlight = true
-        val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
-        ic.commitText((if (before.isNotEmpty() && !before[0].isWhitespace()) " " else "") + text, 1)
-        val tail = text.takeLast(12)
+        // Apps like Messages and WhatsApp restore their saved draft just after you come
+        // back, which wipes text typed in straight away. So wait for the box to settle,
+        // type it in, check it stuck, and try once more before offering the button.
+        scanAttempt(0)
+    }
+
+    private val scanDelays = longArrayOf(700, 1300)
+
+    private fun scanAttempt(n: Int) {
         main.postDelayed({
-            val now = currentInputConnection?.getTextBeforeCursor(tail.length + 2, 0)?.toString().orEmpty()
-            scanInFlight = false
-            if (now.contains(tail)) { scanText = null; refreshSuggestions() } else showScanChip()
-        }, 350)
+            val text = scanText
+            val ic = currentInputConnection
+            val ei = currentInputEditorInfo
+            if (text == null || ic == null || ei == null || ei.packageName == packageName) {
+                scanInFlight = false
+                if (text != null) showScanChip()
+                return@postDelayed
+            }
+            val tail = text.takeLast(12)
+            if (!ic.getTextBeforeCursor(tail.length + 2, 0)?.toString().orEmpty().contains(tail)) {
+                val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
+                ic.commitText((if (before.isNotEmpty() && !before[0].isWhitespace()) " " else "") + text, 1)
+            }
+            main.postDelayed({
+                val now = currentInputConnection?.getTextBeforeCursor(tail.length + 2, 0)?.toString().orEmpty()
+                when {
+                    now.contains(tail) -> { scanInFlight = false; scanText = null; refreshSuggestions() }
+                    n + 1 < scanDelays.size -> scanAttempt(n + 1)
+                    else -> { scanInFlight = false; showScanChip() }
+                }
+            }, 400)
+        }, scanDelays[n])
     }
 
     private fun showScanChip() {
