@@ -175,7 +175,7 @@ class ScanActivity : AppCompatActivity() {
                     status.text = "No text found. Try again closer, with more light."
                     picker.visibility = android.view.View.GONE; pickerTools.visibility = android.view.View.GONE
                 } else {
-                    status.text = "Tap words to add or remove them, or drag across the words you want. Edit below if you like, then tap Insert text."
+                    status.text = "Tap words to add or remove them, or drag across the words you want. Pinch or use + to zoom in. Edit below if you like, then tap Insert text."
                     result.setText(t)
                     insert.isEnabled = true
                     showPicker(uri, image.width, image.height, text)

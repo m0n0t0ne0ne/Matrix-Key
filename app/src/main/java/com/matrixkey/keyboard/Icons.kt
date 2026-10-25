@@ -45,7 +45,6 @@ object Icons {
         Icon.CHEVRON_RIGHT to p { moveTo(9.5f, 6f); lineTo(15.5f, 12f); lineTo(9.5f, 18f) },
         Icon.CHEVRON_LEFT to p { moveTo(14.5f, 6f); lineTo(8.5f, 12f); lineTo(14.5f, 18f) },
         Icon.CLIPBOARD to p { roundRect(5f, 5f, 19f, 21f, 2f); roundRect(9f, 3f, 15f, 7f, 1f); moveTo(8.5f, 11f); lineTo(15.5f, 11f); moveTo(8.5f, 14.5f); lineTo(15.5f, 14.5f); moveTo(8.5f, 18f); lineTo(13f, 18f) },
-        Icon.GIF to p { moveTo(12f, 3f); lineTo(21f, 12f); lineTo(12f, 21f); lineTo(3f, 12f); close(); moveTo(12f, 8.5f); lineTo(12f, 15.5f); moveTo(8.5f, 12f); lineTo(15.5f, 12f) },
         Icon.AI to p { moveTo(14.5f, 6.5f); lineTo(17.5f, 9.5f); lineTo(9f, 18f); lineTo(5.5f, 18.5f); lineTo(6f, 15f); close(); moveTo(5f, 3f); lineTo(5f, 7.5f); moveTo(2.75f, 5.25f); lineTo(7.25f, 5.25f); moveTo(19f, 2.5f); lineTo(19f, 5.5f); moveTo(17.5f, 4f); lineTo(20.5f, 4f) },
         Icon.SETTINGS to p { circle(12f, 12f, 3f); circle(12f, 12f, 8f) },
         Icon.CLOSE to p { moveTo(6f, 6f); lineTo(18f, 18f); moveTo(18f, 6f); lineTo(6f, 18f) },
@@ -66,6 +65,27 @@ object Icons {
         Icon.GRID to p { roundRect(3.5f, 3.5f, 10.5f, 10.5f, 2.2f); roundRect(13.5f, 3.5f, 20.5f, 10.5f, 2.2f); roundRect(3.5f, 13.5f, 10.5f, 20.5f, 2.2f); roundRect(13.5f, 13.5f, 20.5f, 20.5f, 2.2f) },
         Icon.SETTINGS to gear(),
     )
+
+    private val gifText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+        letterSpacing = 0.04f
+    }
+
+    /** "GIF" in bold letters inside a rounded badge, like the label on GIF buttons everywhere. */
+    private fun drawGif(canvas: Canvas, color: Int, scale: Float, dotted: Boolean) {
+        val r = RectF(1.5f, 5f, 22.5f, 19f)
+        matrix.mapRect(r)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2f * scale
+        paint.pathEffect = if (dotted) DashPathEffect(floatArrayOf(0.01f, 3.0f * scale), 0f) else null
+        canvas.drawRoundRect(r, 4f * scale, 4f * scale, paint)
+        paint.pathEffect = null
+        gifText.color = color
+        gifText.textSize = 8.6f * scale
+        val fm = gifText.fontMetrics
+        canvas.drawText("GIF", r.centerX(), r.centerY() - (fm.ascent + fm.descent) / 2, gifText)
+    }
 
     /** A filled gear with a round hole, like Material's settings icon. */
     private fun gear(): Path {
@@ -92,6 +112,7 @@ object Icons {
         matrix.postTranslate(cx - 12f * scale, cy - 12f * scale)
 
         paint.color = color
+        if (icon == Icon.GIF) { drawGif(canvas, color, scale, dotted); return }
         val solid = if (!dotted) solidFills[icon] else null
         if (solid != null) {
             tmp.reset()

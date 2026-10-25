@@ -1426,7 +1426,12 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     private fun ui() = PanelUi(this, theme, FontManager.keyTypeface(this, prefs.keyFont)) { v -> keyboard.feedback.key(v) }
 
     private fun showPanelView(v: View) {
-        val h = keyboard.height.takeIf { it > 0 } ?: keyboard.measuredHeight
+        val keysH = keyboard.height.takeIf { it > 0 } ?: keyboard.measuredHeight
+        // Emoji and GIFs get a taller window (like Gboard's), so more fit on screen.
+        // Never more than about half the screen, so the conversation stays visible.
+        val h = if (v is EmojiPanel || v is GifPanel)
+            maxOf(keysH, minOf((keysH * 1.4f).toInt(), (resources.displayMetrics.heightPixels * 0.5f).toInt()))
+        else keysH
         (v.parent as? ViewGroup)?.removeView(v)
         panel?.let { if (it !== v) content.removeView(it) }
         content.addView(v, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, h))
