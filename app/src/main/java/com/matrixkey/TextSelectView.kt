@@ -26,6 +26,13 @@ class TextSelectView(context: Context, private val accent: Int) : View(context) 
 
     var onChange: ((String) -> Unit)? = null
 
+    /**
+     * Off (the default): dragging selects just that run of words.
+     * On: each drag adds its run to what's already selected, so you can pick
+     * several separate sections.
+     */
+    var addMode = false
+
     private var bitmap: Bitmap? = null
     private var words: List<Word> = emptyList()
     private var selected = BooleanArray(0)
@@ -52,12 +59,14 @@ class TextSelectView(context: Context, private val accent: Int) : View(context) 
     fun set(bmp: Bitmap, photoWidth: Int, list: List<Word>) {
         bitmap = bmp
         words = list
-        selected = BooleanArray(list.size) { true }
+        selected = BooleanArray(list.size) { !addMode }
         zoom = 1f; panX = 0f; panY = 0f
         photoToBitmap = bmp.width / photoWidth.toFloat()
         requestLayout(); invalidate()
         emit()
     }
+
+    fun allSelected() = selected.isNotEmpty() && selected.all { it }
 
     fun selectAll(on: Boolean) {
         java.util.Arrays.fill(selected, on)
@@ -212,7 +221,7 @@ class TextSelectView(context: Context, private val accent: Int) : View(context) 
                     if (cur >= 0) {
                         // Drag picks the run of words from where you started to here.
                         val lo = minOf(anchor, cur); val hi = maxOf(anchor, cur)
-                        for (i in selected.indices) selected[i] = i in lo..hi
+                        for (i in selected.indices) selected[i] = (addMode && before[i]) || i in lo..hi
                         invalidate(); emit()
                     }
                 }

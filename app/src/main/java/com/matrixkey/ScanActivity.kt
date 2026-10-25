@@ -36,6 +36,8 @@ class ScanActivity : AppCompatActivity() {
         const val PENDING_AT = "ocr_pending_at"
         private const val REQ_CAMERA = 61
         private const val REQ_PICK = 62
+        private const val MULTI_HINT = "Multi-select is on: each drag or tap adds to what's highlighted, so you can pick separate sections. Tap a highlighted word to remove it. Tap Multi ✓ to go back to normal."
+        private const val PICK_HINT = "Tap words to add or remove them, or drag across the words you want. For separate sections, turn on Multi-select. Pinch or use + to zoom in. Edit below if you like, then tap Insert text."
     }
 
     private lateinit var status: TextView
@@ -82,10 +84,29 @@ class ScanActivity : AppCompatActivity() {
             bottomMargin = px(8f)
         })
         pickerTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; visibility = android.view.View.GONE }
-        pickerTools.addView(mkButton(this, false).apply { text = "Select all"; setOnClickListener { picker.selectAll(true) } },
+        fun tight(b: Button) = b.apply { setPadding(px(6f), px(10f), px(6f), px(10f)); maxLines = 1 }
+        pickerTools.addView(tight(mkButton(this, false)).apply { text = "Select all"; setOnClickListener { picker.selectAll(true) } },
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = px(8f) })
-        pickerTools.addView(mkButton(this, false).apply { text = "Clear"; setOnClickListener { picker.selectAll(false) } },
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        pickerTools.addView(tight(mkButton(this, false)).apply { text = "Clear"; setOnClickListener { picker.selectAll(false) } },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = px(8f) })
+        // Multi-select: two versions of one button (outlined = off, filled = on).
+        val multiOff = tight(mkButton(this, false)).apply { text = "Multi-select" }
+        val multiOn = tight(mkButton(this, true)).apply { text = "Multi ✓"; visibility = android.view.View.GONE }
+        fun setMulti(on: Boolean) {
+            picker.addMode = on
+            multiOff.visibility = if (on) android.view.View.GONE else android.view.View.VISIBLE
+            multiOn.visibility = if (on) android.view.View.VISIBLE else android.view.View.GONE
+            // Starting from "everything highlighted" would leave nothing to add, so begin empty.
+            if (on && picker.allSelected()) picker.selectAll(false)
+            status.text = if (on) MULTI_HINT else PICK_HINT
+        }
+        multiOff.setOnClickListener { setMulti(true) }
+        multiOn.setOnClickListener { setMulti(false) }
+        val multi = android.widget.FrameLayout(this).apply {
+            addView(multiOff, android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(multiOn, android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        pickerTools.addView(multi, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.2f))
         col.addView(pickerTools, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             bottomMargin = px(12f)
         })
@@ -175,7 +196,7 @@ class ScanActivity : AppCompatActivity() {
                     status.text = "No text found. Try again closer, with more light."
                     picker.visibility = android.view.View.GONE; pickerTools.visibility = android.view.View.GONE
                 } else {
-                    status.text = "Tap words to add or remove them, or drag across the words you want. Pinch or use + to zoom in. Edit below if you like, then tap Insert text."
+                    status.text = if (picker.addMode) MULTI_HINT else PICK_HINT
                     result.setText(t)
                     insert.isEnabled = true
                     showPicker(uri, image.width, image.height, text)
