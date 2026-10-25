@@ -192,9 +192,11 @@ class TextSelectView(context: Context, private val accent: Int) : View(context) 
                 mode = when {
                     anchor >= 0 -> Mode.SELECT
                     zoom > 1f -> Mode.PAN
-                    else -> return false   // let the page scroll
+                    // Not zoomed and off the words: keep watching for a second finger (pinch),
+                    // but let the page scroll if this turns out to be a one-finger swipe.
+                    else -> Mode.NONE
                 }
-                parent?.requestDisallowInterceptTouchEvent(true)
+                if (mode != Mode.NONE) parent?.requestDisallowInterceptTouchEvent(true)
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
                 // Second finger: it's a pinch. Undo anything the first finger just dragged.
