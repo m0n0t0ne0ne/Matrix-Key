@@ -1,4 +1,6 @@
 # Publishes a release, either:
+#   - automatically, when a push to main raises versionName in app/build.gradle.kts
+#     (nothing happens if a release for that version already exists),
 #   - from the Actions tab: Release › Run workflow (tags the current main commit as v<versionName>), or
 #   - when a version tag such as v1.0 is pushed.
 # Builds from exactly that commit, signs with the key held in repository secrets,
@@ -12,6 +14,10 @@ name: Release
 on:
   push:
     tags: ['v*']
+    branches: [main]
+    paths:
+      - app/build.gradle.kts          # where versionName lives
+      - .github/workflows/release.yml
   workflow_dispatch:
 
 permissions:
@@ -22,7 +28,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # On a push to main: release only if this versionName hasn't been released yet.
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      release: ${{ steps.check.outputs.release }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "push" ] || [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          app=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          if gh release view "v$app" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::notice::v$app is already released; nothing to do."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Releasing v$app."
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
   release:
+    needs: check
+    if: needs.check.outputs.release == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: release
@@ -41,7 +76,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           app=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || [ "$GITHUB_REF_TYPE" = "branch" ]; then
             tag="v$app"
             if gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
               echo "::error::Release $tag already exists. Raise versionName in app/build.gradle.kts first."; exit 1
