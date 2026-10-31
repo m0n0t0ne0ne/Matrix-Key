@@ -526,6 +526,10 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         lastGlide = null
         if (isWordChar(text) && !(text[0].isDigit() && composing.isEmpty() && mode != Mode.ALPHA)) {
             keepLowerI = false
+            // One batch, so the app reports a single cursor change: a late report
+            // for the space alone used to look like a cursor move and cut the
+            // first letter off the word ("if" → "i" + "f").
+            ic.beginBatchEdit()
             if (phantomSpace) { ic.commitText(" ", 1); phantomSpace = false }
             if (noSuggestions) {
                 ic.commitText(text, 1)
@@ -533,6 +537,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                 composing.append(text)
                 ic.setComposingText(composing, 1)
             }
+            ic.endBatchEdit()
             if (shift == ShiftState.ON) setShift(ShiftState.OFF)
             refreshSuggestions()
         } else {
@@ -731,8 +736,10 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         if (before.isEmpty() || before.last() != 'i') return false
         if (before.length == 2 && !(before[0].isWhitespace() || before[0] in "([{\"“‘")) return false
         if (keepLowerI) { keepLowerI = false; return false }
+        ic.beginBatchEdit()
         ic.deleteSurroundingText(1, 0)
         ic.commitText("I", 1)
+        ic.endBatchEdit()
         return true
     }
 
@@ -915,7 +922,11 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         selStart = newSelStart; selEnd = newSelEnd
         if (deleteAnchor >= 0 && newSelStart == newSelEnd && newSelEnd != deleteAnchor) deleteAnchor = -1
         // The cursor moved away from the word being typed (tapped elsewhere).
-        if (composing.isNotEmpty() && (candidatesStart < 0 || newSelEnd != candidatesEnd || newSelStart != newSelEnd)) {
+        // A late report of the keyboard's own typing (it still ends with the word,
+        // right at the cursor) is not a move.
+        if (composing.isNotEmpty() && (candidatesStart < 0 || newSelEnd != candidatesEnd || newSelStart != newSelEnd) &&
+            !staleOwnUpdate(newSelEnd)
+        ) {
             currentInputConnection?.finishComposingText()
             composing.clear()
             refreshSuggestions()
@@ -932,6 +943,19 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                 refreshSuggestions()
             }
         }
+    }
+
+    /** True when a selection report is just lagging behind the keyboard's own typing. */
+    private fun staleOwnUpdate(reportedEnd: Int): Boolean {
+        if (SystemClock.uptimeMillis() - lastOwnActionAt > 400) return false
+        val ic = currentInputConnection ?: return false
+        // Where the cursor really is now: a stale report points somewhere earlier.
+        val et = ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)
+            ?: return false
+        if (et.selectionStart != et.selectionEnd || et.selectionEnd < 0) return false
+        if (et.startOffset + et.selectionEnd == reportedEnd) return false
+        val word = composing.toString()
+        return ic.getTextBeforeCursor(word.length, 0)?.toString() == word
     }
 
     /** Remembers what [word] was offered alongside, for proofreading later. */
