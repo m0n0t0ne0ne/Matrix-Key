@@ -95,6 +95,8 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     private var lastCorrection: Pair<String, String>? = null
     /** Last glided word and its alternatives. */
     private var lastGlide: String? = null
+    /** The word before the last glided word, so swapping the glide learns the right pair. */
+    private var glidePrev: String? = null
     private var glideAlternatives: List<String> = emptyList()
 
     /**
@@ -120,6 +122,10 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     // Field flags
     private var noLearning = false
     private var noSuggestions = false
+    /** Plain-text field where a lone "i" should become "I" (not passwords, emails, links or numbers). */
+    private var capitalIField = true
+    /** You undid "I" back to "i" with ⌫: leave that one alone. */
+    private var keepLowerI = false
     /** Fields that ask for no suggestions (many apps set this just to hide spell-check underlines):
      *  suggestions and next-word predictions still show, but nothing is changed automatically. */
     private var noAutocorrect = false
@@ -446,6 +452,10 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         noSuggestions = isPassword || cls != InputType.TYPE_CLASS_TEXT ||
             variation == InputType.TYPE_TEXT_VARIATION_URI || variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
             variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS
+        capitalIField = !isPassword && cls != InputType.TYPE_CLASS_NUMBER && cls != InputType.TYPE_CLASS_PHONE &&
+            cls != InputType.TYPE_CLASS_DATETIME && !(cls == InputType.TYPE_CLASS_TEXT && (
+                variation == InputType.TYPE_TEXT_VARIATION_URI || variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+                    variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS))
         noAutocorrect = noSuggestions || (info.inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) != 0
         val incognitoField = (info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
         noLearning = isPassword || !prefs.learn || (prefs.incognito && incognitoField)
@@ -515,6 +525,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         lastCorrection = null
         lastGlide = null
         if (isWordChar(text) && !(text[0].isDigit() && composing.isEmpty() && mode != Mode.ALPHA)) {
+            keepLowerI = false
             if (phantomSpace) { ic.commitText(" ", 1); phantomSpace = false }
             if (noSuggestions) {
                 ic.commitText(text, 1)
@@ -528,6 +539,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             // Punctuation / symbols end the word.
             val punct = text.length == 1 && text[0] in ".,!?;:"
             if (composing.isNotEmpty()) finishWord(autocorrect = punct)
+            else if (punct || text in setOf(")", "]", "}", "\"", "”")) capitalizeLoneI(ic)
             if (punct) {
                 // "word ." → "word."
                 val before = ic.getTextBeforeCursor(2, 0)?.toString().orEmpty()
@@ -590,6 +602,9 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             finishWord(autocorrect = true)
             ic.commitText(" ", 1)
         } else {
+            // Fields that take letters straight in (like Google Keep notes) never
+            // compose a word, so "i" + space gets its capital here.
+            val fixedI = capitalizeLoneI(ic)
             val before = ic.getTextBeforeCursor(2, 0)?.toString().orEmpty()
             if (prefs.doubleSpacePeriod && now - lastSpaceTime < 700 && before.length == 2 && before[1] == ' ' &&
                 (before[0].isLetterOrDigit() || before[0] in ")\"'")
@@ -599,7 +614,8 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             } else {
                 ic.commitText(" ", 1)
             }
-            lastCorrection = null
+            // ⌫ right after turns it back into "i".
+            lastCorrection = if (fixedI) "i" to "I" else null
         }
         phantomSpace = false
         lastGlide = null
@@ -626,6 +642,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                 ic.deleteSurroundingText(corrected.length + 1, 0)
                 ic.commitText(typed, 1)
                 lastCorrection = null
+                if (typed == "i") keepLowerI = true
                 if (!noLearning) engineHandler.post { engine.learnRejectedCorrection(typed) }
                 refreshSuggestions()
                 return
@@ -660,7 +677,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     private fun onEnter() {
         if (target != Target.NONE) { onSearchSubmit(); return }
         val ic = currentInputConnection ?: return
-        if (composing.isNotEmpty()) finishWord(autocorrect = true)
+        if (composing.isNotEmpty()) finishWord(autocorrect = true) else capitalizeLoneI(ic)
         phantomSpace = false
         val ei = currentInputEditorInfo
         val action = (ei?.imeOptions ?: 0) and EditorInfo.IME_MASK_ACTION
@@ -704,6 +721,34 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     /** The word "i" on its own is always written "I". */
     private fun capitalI(w: String): String = if (w == "i") "I" else w
 
+    /**
+     * For letters typed straight into the field (no word being composed): if the
+     * word just finished is a lone "i", make it "I". "it", "is", "it's", "Wi" … are left alone.
+     */
+    private fun capitalizeLoneI(ic: android.view.inputmethod.InputConnection): Boolean {
+        if (!capitalIField || composing.isNotEmpty()) return false
+        val before = ic.getTextBeforeCursor(2, 0)?.toString() ?: return false
+        if (before.isEmpty() || before.last() != 'i') return false
+        if (before.length == 2 && !(before[0].isWhitespace() || before[0] in "([{\"“‘")) return false
+        if (keepLowerI) { keepLowerI = false; return false }
+        ic.deleteSurroundingText(1, 0)
+        ic.commitText("I", 1)
+        return true
+    }
+
+    /**
+     * The word right before the cursor, read from the field itself, so context works
+     * even for words typed straight in or after moving the cursor. Null at the start
+     * of a sentence or line.
+     */
+    private fun contextWord(ic: android.view.inputmethod.InputConnection): String? {
+        val before = ic.getTextBeforeCursor(64, 0)?.toString() ?: return prevWord
+        val trimmed = before.trimEnd()
+        if (trimmed.isEmpty() || before.substring(trimmed.length).contains('\n')) return null
+        val word = Regex("[\\p{L}'’]+$").find(trimmed)?.value?.replace('’', '\'')?.trim('\'') ?: return null
+        return word.ifEmpty { null }
+    }
+
     private fun learn(word: String, typo: String?) {
         if (noLearning) { prevWord = word; return }
         val prev = prevWord
@@ -732,8 +777,10 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             return
         }
         val ic = currentInputConnection ?: return
-        if (composing.isNotEmpty()) finishWord(autocorrect = false)
-        val prev = prevWord
+        if (composing.isNotEmpty()) finishWord(autocorrect = false) else capitalizeLoneI(ic)
+        val prev = contextWord(ic)
+        prevWord = prev
+        glidePrev = prev
         val caps = shift
         engineHandler.post {
             val words = engine.decodeGlide(path, times, prev, prefs.blockOffensive)
@@ -1110,8 +1157,10 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
                     ic.deleteSurroundingText(glided.length, 0)
                     ic.commitText(s, 1)
                     lastGlide = s
-                    val p = prevWord
-                    if (!noLearning && s.all { it.isLetter() || it == '\'' }) engineHandler.post { engine.learnGlide(s); engine.rejectGlide(glided); engine.learnWord(s, p) }
+                    // Learn "previous word → chosen word", not "rejected glide → chosen word".
+                    val p = glidePrev
+                    if (!noLearning && s.all { it.isLetter() || it == '\'' }) engineHandler.post { engine.learnGlide(s); engine.rejectGlide(glided); engine.unlearnWord(glided, p); engine.learnWord(s, p) }
+                    prevWord = s
                     glideAlternatives = (listOf(glided) + glideAlternatives).filter { it != s }
                     remember(s, glideAlternatives)
                     showGlideAlternatives(s)

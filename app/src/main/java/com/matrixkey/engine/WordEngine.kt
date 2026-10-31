@@ -127,7 +127,9 @@ class WordEngine private constructor(private val context: Context) {
 
     private fun bigramBoost(prev: String?, w: String): Float {
         if (prev == null) return 0f
-        val n = bigrams[prev]?.get(w) ?: return 0f
+        // Learned pairs are stored in lowercase; "It" at a sentence start must find "it".
+        val p = prev.lowercase().trim { !it.isLetter() && it != '\'' }
+        val n = bigrams[p]?.get(w) ?: return 0f
         return ln(1f + n) * 3f
     }
 
@@ -410,7 +412,7 @@ class WordEngine private constructor(private val context: Context) {
                     }
                 }
                 val rank = nextHints?.indexOf(w) ?: -1
-                val context = if (rank >= 0) 2.5f - rank * 0.12f else 0f
+                val context = if (rank >= 0) max(0.8f, 2.5f - rank * 0.12f) else 0f
 
                 // Two-key words are just a straight line: the ends and the direction decide.
                 val short = pts.size <= 2
@@ -436,7 +438,8 @@ class WordEngine private constructor(private val context: Context) {
                     loopFit * 4f - loopsUnexplained * 2f - loopsMissing * 0.5f +
                     freq(w) * 0.9f + bigramBoost(prev, w) * 1.2f + context +
                     (if (habitsGlide[w] != null) 4.5f else 0f) - min(3f, (glideRejected[w] ?: 0) * 1f) +
-                    ambiguityBias(w, prev) + (if (w in personal) PERSONAL_GLIDE_BONUS else 0f)
+                    ambiguityBias(w, prev) + (if (w in personal) PERSONAL_GLIDE_BONUS else 0f) -
+                    (if (p0 in NO_SUBJECT_AFTER && w in SUBJECT_CONTRACTIONS) 3f else 0f)
                 scored += w to score
             }
         }
@@ -701,6 +704,20 @@ class WordEngine private constructor(private val context: Context) {
         dirty = true
     }
 
+    /** Takes back what [learnWord] counted for a swiped word you then swapped for another. */
+    fun unlearnWord(word: String, prev: String?) {
+        val w = word.lowercase().trim { !it.isLetter() && it != '\'' }
+        if (w.isEmpty()) return
+        userCounts[w]?.let { if (it <= 1) userCounts.remove(w) else userCounts[w] = it - 1 }
+        prev?.lowercase()?.trim { !it.isLetter() && it != '\'' }?.let { p ->
+            bigrams[p]?.let { m ->
+                m[w]?.let { if (it <= 1) m.remove(w) else m[w] = it - 1 }
+                if (m.isEmpty()) bigrams.remove(p)
+            }
+        }
+        dirty = true
+    }
+
     /** You undid an autocorrection: stop correcting this word. */
     fun learnRejectedCorrection(typed: String) {
         val t = typed.lowercase()
@@ -892,6 +909,16 @@ class WordEngine private constructor(private val context: Context) {
 
         private val FALLBACK = listOf("the", "to", "and", "a", "i", "you", "it", "is", "of", "that", "in", "for", "on", "this", "my", "me", "with", "be", "have", "so", "but", "not", "just", "we", "are", "was", "what", "do", "can", "your", "at", "if", "all", "like", "know", "get", "up", "no", "yes", "ok", "okay", "thanks", "good", "love", "time", "will", "how", "now", "one", "about", "out", "there", "when", "go", "they", "would", "want", "think", "see", "here", "really", "right", "well", "got", "make", "going", "today", "tomorrow", "appropriate")
 
+        /** "you're", "I'm" … start a clause; they can't follow "be", "the", "to" … ("to be upper", not "to be you're"). */
+        private val SUBJECT_CONTRACTIONS = setOf(
+            "i'm", "you're", "we're", "they're", "he's", "she's", "it's", "i've", "you've", "we've", "they've",
+            "i'll", "you'll", "we'll", "they'll", "i'd", "you'd", "we'd", "they'd",
+        )
+        private val NO_SUBJECT_AFTER = setOf(
+            "be", "been", "being", "to", "the", "a", "an", "my", "your", "his", "our", "their", "its",
+            "of", "for", "with", "from", "am", "is", "are", "was", "were", "very",
+        )
+
         private val DEFAULT_NEXT = listOf("I", "the", "and", "to", "you", "it", "is")
 
         /**
@@ -901,7 +928,7 @@ class WordEngine private constructor(private val context: Context) {
         private val CONTEXT_NEXT: Map<String, List<String>> = run {
             val m = LinkedHashMap<String, MutableList<String>>()
             """
-            i:am think have was will can don't just know love want need would really
+            i:am think have was will can don't just know love want need would really feel hope guess mean make see get got eat said did like go
             i'm:not going so sure just good fine on in at sorry
             i'll:be let see do have get call
             i've:been got never seen
@@ -914,7 +941,7 @@ class WordEngine private constructor(private val context: Context) {
             they're:not going all
             he:is was said has will
             she:is was said has will
-            it:is was will would
+            it:is was will would seems looks does has sounds works feels
             it's:a not the so ok okay just been
             that:is was i you the it's would
             that's:what why it not so a the
@@ -942,7 +969,7 @@ class WordEngine private constructor(private val context: Context) {
             have:a to you been the fun
             has:been a to the
             had:a to been the
-            be:a the there able home back
+            be:a the there able home back good fine done ready sure careful
             been:a the there so
             get:the to a it back home some
             got:a it the to my
@@ -1003,6 +1030,9 @@ class WordEngine private constructor(private val context: Context) {
             fill:out in
             in:front
             right:now there
+            upper:case
+            lower:case
+            being:so a the able
             over:there here the
             out:of there
             all:the of right
