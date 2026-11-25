@@ -64,7 +64,7 @@ dependencies {
     // shared with other apps instead of being bundled (saves ~40 MB). Works offline
     // once Play services has downloaded it.
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
-    implementation("com.google.android.material:material:1.12.0")
+    implementation("com.google.android.material:material:1.14.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }
 
