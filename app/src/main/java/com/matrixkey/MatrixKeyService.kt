@@ -190,6 +190,8 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     }
 
     override fun onSharedPreferenceChanged(sp: SharedPreferences?, key: String?) {
+        // Reordering toolbar buttons is already shown; nothing to rebuild.
+        if (key == "tool_order") return
         needsReload = true
         if (key == "reset_learned_at") {
             if (::keyboard.isInitialized) keyboard.clearAim()
@@ -419,9 +421,36 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             add(TopBarView.Tool.SCAN)
             add(TopBarView.Tool.SETTINGS)
             if (prefs.voice) add(TopBarView.Tool.MIC)
-        }
+        }.let { orderTools(it) }
         rebuildKeys()
         topBar.invalidate()
+    }
+
+    /** Puts the shown toolbar buttons in the order you arranged them (new ones keep their default place). */
+    private fun orderTools(shown: List<TopBarView.Tool>): List<TopBarView.Tool> {
+        val full = fullToolOrder()
+        return shown.sortedBy { full.indexOf(it) }
+    }
+
+    /** Every tool, in your saved order, with any not yet saved in their default place. */
+    private fun fullToolOrder(): List<TopBarView.Tool> {
+        val saved = prefs.toolOrder.mapNotNull { n -> TopBarView.Tool.values().firstOrNull { it.name == n } }.distinct()
+        val out = ArrayList(saved)
+        TopBarView.Tool.values().forEachIndexed { defIdx, t ->
+            if (t in out) return@forEachIndexed
+            // Insert after the closest tool that comes before it by default.
+            val before = TopBarView.Tool.values().take(defIdx).lastOrNull { it in out }
+            out.add(if (before == null) 0 else out.indexOf(before) + 1, t)
+        }
+        return out
+    }
+
+    override fun onToolsReordered(order: List<TopBarView.Tool>) {
+        // Hidden tools (e.g. GIF turned off) keep their slots; the shown ones take the new order.
+        val full = fullToolOrder().toMutableList()
+        val slots = full.indices.filter { full[it] in order }
+        slots.forEachIndexed { k, idx -> full[idx] = order[k] }
+        prefs.toolOrder = full.map { it.name }
     }
 
     private fun rebuildKeys() {
@@ -661,6 +690,11 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
             lastGlide = null
             if (before == glided) {
                 ic.deleteSurroundingText(glided.length, 0)
+                // A swiped word you deleted right away was usually a misread: don't
+                // let it count as a word you use (that made it win more swipes).
+                val p = glidePrev
+                if (!noLearning) engineHandler.post { engine.unlearnWord(glided, p) }
+                prevWord = p
                 updateShiftFromField(); refreshSuggestions()
                 return
             }
@@ -744,6 +778,21 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
     }
 
     /**
+     * True right after "." "?" or "!" with no space yet ("up.|"): a swiped word goes
+     * in with its own space there, so it starts a new sentence and gets its capital.
+     */
+    private fun sentenceEndJustBefore(ic: android.view.inputmethod.InputConnection): Boolean {
+        val ei = currentInputEditorInfo ?: return false
+        if (!prefs.autoCaps || mode != Mode.ALPHA) return false
+        if ((ei.inputType and InputType.TYPE_TEXT_FLAG_CAP_SENTENCES) == 0) return false
+        val before = ic.getTextBeforeCursor(3, 0)?.toString()?.trimEnd('"', '”', '\'', '’', ')') ?: return false
+        if (before.isEmpty() || before.last() !in ".?!") return false
+        // The mark must follow a word ("up."), not another mark ("...").
+        val prevChar = before.getOrNull(before.length - 2)
+        return prevChar == null || prevChar.isLetterOrDigit()
+    }
+
+    /**
      * The word right before the cursor, read from the field itself, so context works
      * even for words typed straight in or after moving the cursor. Null at the start
      * of a sentence or line.
@@ -788,7 +837,7 @@ class MatrixKeyService : InputMethodService(), KeyboardView.Listener, TopBarView
         val prev = contextWord(ic)
         prevWord = prev
         glidePrev = prev
-        val caps = shift
+        val caps = if (shift == ShiftState.OFF && sentenceEndJustBefore(ic)) ShiftState.ON else shift
         engineHandler.post {
             val words = engine.decodeGlide(path, times, prev, prefs.blockOffensive)
             // Personal-dictionary entries that start with the glided word (e.g. "kevin" → your email).

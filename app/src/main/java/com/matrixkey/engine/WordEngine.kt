@@ -125,6 +125,18 @@ class WordEngine private constructor(private val context: Context) {
         return b + p + ln(1f + u) * 2.2f
     }
 
+    /**
+     * Like [freq] for swipes, but how often you've used a word only adds up to a
+     * point: otherwise very common words of yours ("the", "something") beat the
+     * word your finger actually traced ("three", "showing").
+     */
+    private fun glideFreq(w: String): Float {
+        val b = base[w] ?: 0f
+        val u = userCounts[w] ?: 0
+        val p = if (w in personal) 12f else 0f
+        return b + p + min(ln(1f + u) * 1.65f, 4.4f)
+    }
+
     private fun bigramBoost(prev: String?, w: String): Float {
         if (prev == null) return 0f
         // Learned pairs are stored in lowercase; "It" at a sentence start must find "it".
@@ -433,11 +445,14 @@ class WordEngine private constructor(private val context: Context) {
                     for (l in loopPts) if (doubles.none { c -> keyCenters[c]?.let { dist(l, it) < 0.85f * kw } == true }) loopsUnexplained += 1f
                 }
 
-                val score = -dtw * 6.75f - miss * 2.81f - extra * 0.28f - se * 2.475f - (if (short) se * 0.06f else 0f) -
-                    lenPen * 1.69f - anchorCost * 4.45f - cornerCost * 0.7f - direction * 0.5f +
+                // Shape weights are 1.25× the 1.8 tuning, and words you use a lot get a capped
+                // boost, so where your finger went counts for more than how often you type
+                // a word (tuned in tools/glide-sim, see tune6.py).
+                val score = -dtw * 8.44f - miss * 3.51f - extra * 0.35f - se * 3.09f - (if (short) se * 0.075f else 0f) -
+                    lenPen * 2.11f - anchorCost * 5.56f - cornerCost * 0.875f - direction * 0.5f +
                     loopFit * 4f - loopsUnexplained * 2f - loopsMissing * 0.5f +
-                    freq(w) * 0.9f + bigramBoost(prev, w) * 1.2f + context +
-                    (if (habitsGlide[w] != null) 4.5f else 0f) - min(3f, (glideRejected[w] ?: 0) * 1f) +
+                    glideFreq(w) * 0.9f + bigramBoost(prev, w) * 1.2f + context +
+                    (if (habitsGlide[w] != null) 1.5f else 0f) - min(3f, (glideRejected[w] ?: 0) * 1f) +
                     ambiguityBias(w, prev) + (if (w in personal) PERSONAL_GLIDE_BONUS else 0f) -
                     (if (p0 in NO_SUBJECT_AFTER && w in SUBJECT_CONTRACTIONS) 3f else 0f)
                 scored += w to score

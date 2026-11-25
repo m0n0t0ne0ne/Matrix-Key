@@ -37,6 +37,8 @@ class TopBarView(context: Context) : View(context) {
         fun onMessageClose()
         /** Close any open panel (emoji, GIFs, clipboard, AI) and show the keys. */
         fun onBackToKeyboard()
+        /** A toolbar button was long-pressed and dragged to a new place: [order] is the new order. */
+        fun onToolsReordered(order: List<Tool>) {}
     }
 
     /** True while a panel replaces the keys: the left button then returns to the keyboard. */
@@ -56,7 +58,10 @@ class TopBarView(context: Context) : View(context) {
     var dotStyle = true
 
     var mode = BarMode.SUGGESTIONS
-        set(v) { field = v; invalidate() }
+        set(v) {
+            if (v != BarMode.TOOLBAR) { removeCallbacks(pickUp); endToolDrag(commit = false) }
+            field = v; invalidate()
+        }
     /**
      * Left, middle, right, then any extra suggestions (reached by scrolling the
      * strip). Text is always drawn at full size: long words widen their slot and
@@ -72,7 +77,15 @@ class TopBarView(context: Context) : View(context) {
     /** Slot drawn emphasized (the word that space will insert). */
     var emphasized = -1
     var tools: List<Tool> = Tool.values().toList()
-        set(v) { field = v; invalidate() }
+        set(v) { if (dragTool == null) { field = v; invalidate() } }
+
+    // Reordering the toolbar: long-press a button, then drag it left or right.
+    private var dragTool: Tool? = null
+    private var dragOrder = ArrayList<Tool>()
+    private var dragX = 0f
+    private var dragGrabOffset = 0f
+    private var toolDownIndex = -1
+    private val pickUp = Runnable { startToolDrag() }
 
     var searchText = ""
     /** Cursor position in [searchText]. */
@@ -235,23 +248,80 @@ class TopBarView(context: Context) : View(context) {
         fill.shader = null
     }
 
+    private fun toolIcon(tool: Tool) = when (tool) {
+        Tool.EMOJI -> Icon.EMOJI
+        Tool.GIF -> Icon.GIF
+        Tool.CLIPBOARD -> Icon.CLIPBOARD
+        Tool.AI -> Icon.AI
+        Tool.SCAN -> Icon.SCAN
+        Tool.SETTINGS -> Icon.SETTINGS
+        Tool.MIC -> Icon.MIC
+    }
+
     private fun drawToolbar(canvas: Canvas) {
         val t = theme
         // Like Gboard: the tools grid sits on the left (tap it to go back to suggestions).
         roundButton(canvas, leftBtn, if (panelOpen) Icon.KEYBOARD else Icon.GRID, if (panelOpen) t.chip else null, t.text)
-        tools.forEachIndexed { i, tool ->
-            val icon = when (tool) {
-                Tool.EMOJI -> Icon.EMOJI
-                Tool.GIF -> Icon.GIF
-                Tool.CLIPBOARD -> Icon.CLIPBOARD
-                Tool.AI -> Icon.AI
-                Tool.SCAN -> Icon.SCAN
-                Tool.SETTINGS -> Icon.SETTINGS
-                Tool.MIC -> Icon.MIC
-            }
+        val dragging = dragTool
+        val order = if (dragging != null) dragOrder else tools
+        order.forEachIndexed { i, tool ->
+            if (tool == dragging || i >= toolRects.size) return@forEachIndexed
             val active = tool == activeTool
-            roundButton(canvas, toolRects[i], icon, if (active) t.accent else if (tool == Tool.MIC) t.pill else null, if (active) t.onAccent else t.text)
+            roundButton(canvas, toolRects[i], toolIcon(tool), if (active) t.accent else if (tool == Tool.MIC) t.pill else null, if (active) t.onAccent else t.text)
         }
+        if (dragging != null && toolRects.isNotEmpty()) {
+            // The lifted button follows the finger, a little larger, on a chip.
+            val base = toolRects[0]
+            val w = base.width() * 1.12f; val h = base.height() * 1.12f
+            val r = RectF(dragX - w / 2, base.centerY() - h / 2, dragX + w / 2, base.centerY() + h / 2)
+            fill.color = ColorUtils.blendARGB(t.chip, t.accent, 0.35f)
+            canvas.drawRoundRect(r, h / 2, h / 2, fill)
+            Icons.draw(canvas, toolIcon(dragging), r.centerX(), r.centerY(), base.height() * 0.6f, t.text, false)
+        }
+    }
+
+    private fun toolCell() = (width - leftBtn.right - 8 * dp) / toolRects.size.coerceAtLeast(1)
+
+    private fun toolIndexAt(x: Float): Int =
+        ((x - leftBtn.right - 4 * dp) / toolCell()).toInt().coerceIn(0, (toolRects.size - 1).coerceAtLeast(0))
+
+    private fun startToolDrag() {
+        val i = toolDownIndex
+        if (mode != BarMode.TOOLBAR || i !in tools.indices || tools.size < 2) return
+        dragOrder = ArrayList(tools)
+        dragTool = tools[i]
+        dragGrabOffset = toolRects[i].centerX() - downX
+        dragX = toolRects[i].centerX()
+        pressed = null
+        parent?.requestDisallowInterceptTouchEvent(true)
+        onTapFeedback?.invoke()
+        invalidate()
+    }
+
+    private fun moveToolDrag(x: Float) {
+        val tool = dragTool ?: return
+        val first = toolRects.first().centerX(); val last = toolRects.last().centerX()
+        dragX = (x + dragGrabOffset).coerceIn(first, last)
+        val target = toolIndexAt(dragX)
+        val from = dragOrder.indexOf(tool)
+        if (target != from) {
+            dragOrder.removeAt(from)
+            dragOrder.add(target, tool)
+            onTapFeedback?.invoke()
+        }
+        invalidate()
+    }
+
+    private fun endToolDrag(commit: Boolean) {
+        dragTool ?: return
+        val order = ArrayList(dragOrder)
+        val changed = order != tools
+        dragTool = null
+        if (commit && changed) {
+            tools = order
+            listener?.onToolsReordered(order)
+        }
+        invalidate()
     }
 
     private fun drawSearch(canvas: Canvas) {
@@ -339,12 +409,7 @@ class TopBarView(context: Context) : View(context) {
             }
             BarMode.TOOLBAR -> {
                 // Whole-cell hit areas, so taps between icons still count.
-                val n = toolRects.size
-                if (n > 0 && x > leftBtn.right) {
-                    val cell = (width - leftBtn.right - 8 * dp) / n
-                    val i = ((x - leftBtn.right - 4 * dp) / cell).toInt().coerceIn(0, n - 1)
-                    return toolRects[i]
-                }
+                if (toolRects.isNotEmpty() && x > leftBtn.right) return toolRects[toolIndexAt(x)]
             }
             BarMode.SEARCH -> {
                 if (rightBtn.contains(x, y)) return rightBtn
@@ -420,12 +485,22 @@ class TopBarView(context: Context) : View(context) {
             stripGesture = mode == BarMode.SUGGESTIONS && strip.contains(e.x, e.y)
             swipeDownX = e.x; swipeDownY = e.y; swipedDown = false
         }
+        // A lifted toolbar button follows the finger until it's let go.
+        if (dragTool != null) {
+            when (e.actionMasked) {
+                MotionEvent.ACTION_MOVE -> moveToolDrag(e.x)
+                MotionEvent.ACTION_UP -> endToolDrag(commit = true)
+                MotionEvent.ACTION_CANCEL -> endToolDrag(commit = false)
+            }
+            return true
+        }
         // Swipe down anywhere on the bar to hide the keyboard.
         if (swipedDown) return true
         if (e.actionMasked == MotionEvent.ACTION_MOVE) {
             val dy = e.y - swipeDownY
             val dx = kotlin.math.abs(e.x - swipeDownX)
             if (dy > 36 * dp && dy > dx * 1.5f) {
+                removeCallbacks(pickUp)
                 swipedDown = true
                 pressed = null; pressedItem = -1; dragging = false
                 invalidate()
@@ -439,9 +514,19 @@ class TopBarView(context: Context) : View(context) {
                 layoutRects()
                 pressed = hitTarget(e.x, e.y)
                 downTime = SystemClock.uptimeMillis()
+                downX = e.x
+                // Hold a toolbar button to pick it up and move it.
+                toolDownIndex = toolRects.indexOfFirst { it === pressed }
+                removeCallbacks(pickUp)
+                if (mode == BarMode.TOOLBAR && toolDownIndex >= 0) postDelayed(pickUp, longPressMs)
                 invalidate()
             }
+            MotionEvent.ACTION_MOVE -> {
+                // Moving before the hold completes is a scroll/slip, not a pick-up.
+                if (kotlin.math.hypot(e.x - swipeDownX, e.y - swipeDownY) > 10 * dp) removeCallbacks(pickUp)
+            }
             MotionEvent.ACTION_UP -> {
+                removeCallbacks(pickUp)
                 val target = pressed
                 pressed = null
                 invalidate()
@@ -450,9 +535,15 @@ class TopBarView(context: Context) : View(context) {
                 onTapFeedback?.invoke()
                 click(target)
             }
-            MotionEvent.ACTION_CANCEL -> { pressed = null; invalidate() }
+            MotionEvent.ACTION_CANCEL -> { removeCallbacks(pickUp); pressed = null; invalidate() }
         }
         return true
+    }
+
+    override fun onDetachedFromWindow() {
+        removeCallbacks(pickUp)
+        endToolDrag(commit = false)
+        super.onDetachedFromWindow()
     }
 
     private fun click(target: Any) {

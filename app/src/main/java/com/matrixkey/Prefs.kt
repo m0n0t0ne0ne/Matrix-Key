@@ -25,6 +25,10 @@ class Prefs(context: Context) {
     val dottedIcons get() = b("dotted_icons", false)
     val emojiKey get() = b("emoji_key", true)
     val toolbar get() = b("toolbar", true)
+    /** Toolbar button order, set by long-pressing and dragging a button (comma-separated tool names). */
+    var toolOrder: List<String>
+        get() = s("tool_order", "").split(',').filter { it.isNotBlank() }
+        set(v) { sp.edit().putString("tool_order", v.joinToString(",")).apply() }
     val oneHanded get() = s("one_handed", "off")
     val keyTextScale get() = s("key_text_size", "1.2").toFloatOrNull() ?: 1.2f
     val heightScale get() = s("kb_height", "1.0").toFloatOrNull() ?: 1f
